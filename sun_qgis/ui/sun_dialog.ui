@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SunDialogBase</class>
+ <widget class="QDialog" name="SunDialogBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>560</width>
+    <height>640</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Solar Radiation (sun)</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupInputs">
+     <property name="title">
+      <string>Inputs</string>
+     </property>
+     <layout class="QGridLayout" name="gridInputs">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelElevation">
+        <property name="text">
+         <string>Elevation DEM [m]</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QgsFileWidget" name="mElevation">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelSlope">
+        <property name="text">
+         <string>Slope [°] (optional)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QgsFileWidget" name="mSlope">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="labelAspect">
+        <property name="text">
+         <string>Aspect [°, GRASS] (optional)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QgsFileWidget" name="mAspect">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="labelLinkeRaster">
+        <property name="text">
+         <string>Linke raster (optional)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QgsFileWidget" name="mLinkeRaster">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="labelAlbedoRaster">
+        <property name="text">
+         <string>Albedo raster (optional)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QgsFileWidget" name="mAlbedoRaster">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="labelMask">
+        <property name="text">
+         <string>Mask raster (optional)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QgsFileWidget" name="mMask">
+        <property name="filter">
+         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTabWidget" name="tabModes">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="tabDaily">
+      <attribute name="title">
+       <string>Daily</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridDaily">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelDay">
+         <property name="text">
+          <string>Day of year [1-365]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QSpinBox" name="mDay">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>365</number>
+         </property>
+         <property name="value">
+          <number>172</number>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelStep">
+         <property name="text">
+          <string>Time step [h]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="mStep">
+         <property name="minimum">
+          <double>0.05</double>
+         </property>
+         <property name="maximum">
+          <double>24.0</double>
+         </property>
+         <property name="singleStep">
+          <double>0.25</double>
+         </property>
+         <property name="value">
+          <double>0.5</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelLinkeValue">
+         <property name="text">
+          <string>Linke turbidity (constant)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QDoubleSpinBox" name="mLinkeValue">
+         <property name="minimum">
+          <double>1.0</double>
+         </property>
+         <property name="maximum">
+          <double>10.0</double>
+         </property>
+         <property name="singleStep">
+          <double>0.1</double>
+         </property>
+         <property name="value">
+          <double>3.0</double>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelAlbedoValue">
+         <property name="text">
+          <string>Albedo (constant)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QDoubleSpinBox" name="mAlbedoValue">
+         <property name="minimum">
+          <double>0.0</double>
+         </property>
+         <property name="maximum">
+          <double>1.0</double>
+         </property>
+         <property name="singleStep">
+          <double>0.05</double>
+         </property>
+         <property name="value">
+          <double>0.2</double>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelOutputs">
+         <property name="text">
+          <string>Outputs</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <layout class="QHBoxLayout" name="layoutOutputs">
+         <item>
+          <widget class="QCheckBox" name="mGlob">
+           <property name="text">
+            <string>Global</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mBeam">
+           <property name="text">
+            <string>Beam</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mDiff">
+           <property name="text">
+            <string>Diffuse</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mRefl">
+           <property name="text">
+            <string>Reflected</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="mInsol">
+           <property name="text">
+            <string>Sunshine h</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabAnnual">
+      <attribute name="title">
+       <string>Annual potential</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridAnnual">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelDayStart">
+         <property name="text">
+          <string>Day from</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QSpinBox" name="mDayStart">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>365</number>
+         </property>
+         <property name="value">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelDayEnd">
+         <property name="text">
+          <string>Day to</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="mDayEnd">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>365</number>
+         </property>
+         <property name="value">
+          <number>365</number>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelDayStep">
+         <property name="text">
+          <string>Sampling stride [days]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="mDayStep">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>60</number>
+         </property>
+         <property name="value">
+          <number>10</number>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelPanelEff">
+         <property name="text">
+          <string>Panel efficiency [0-1]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QDoubleSpinBox" name="mPanelEff">
+         <property name="minimum">
+          <double>0.01</double>
+         </property>
+         <property name="maximum">
+          <double>1.0</double>
+         </property>
+         <property name="singleStep">
+          <double>0.01</double>
+         </property>
+         <property name="value">
+          <double>0.21</double>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelAnnualStep">
+         <property name="text">
+          <string>Time step [h]</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QDoubleSpinBox" name="mAnnualStep">
+         <property name="minimum">
+          <double>0.05</double>
+         </property>
+         <property name="maximum">
+          <double>24.0</double>
+         </property>
+         <property name="singleStep">
+          <double>0.25</double>
+         </property>
+         <property name="value">
+          <double>0.5</double>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QCheckBox" name="mUseHorizon">
+         <property name="text">
+          <string>Horizon precompute (CPU)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QSpinBox" name="mHorizonNAz">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="minimum">
+          <number>16</number>
+         </property>
+         <property name="maximum">
+          <number>256</number>
+         </property>
+         <property name="singleStep">
+          <number>16</number>
+         </property>
+         <property name="value">
+          <number>64</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupOutput">
+     <property name="title">
+      <string>Output</string>
+     </property>
+     <layout class="QGridLayout" name="gridOutput">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelOutputDir">
+        <property name="text">
+         <string>Directory</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QgsFileWidget" name="mOutputDir">
+        <property name="storageMode">
+         <enum>QgsFileWidget::GetDirectory</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelPrefix">
+        <property name="text">
+         <string>File name prefix</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="mPrefix">
+        <property name="text">
+         <string>sun</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QCheckBox" name="mGpu">
+        <property name="text">
+         <string>GPU acceleration (WebGPU)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QCheckBox" name="mAddToProject">
+        <property name="text">
+         <string>Add results to project</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsFileWidget</class>
+   <extends>QWidget</extends>
+   <header>qgsfilewidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>SunDialogBase</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <point>
+      <x>248</x>
+      <y>254</y>
+     </point>
+    </hint>
+    <hint type="destinationlabel">
+     <point>
+      <x>157</x>
+      <y>274</y>
+     </point>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>SunDialogBase</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <point>
+      <x>316</x>
+      <y>260</y>
+     </point>
+    </hint>
+    <hint type="destinationlabel">
+     <point>
+      <x>286</x>
+      <y>274</y>
+     </point>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>mUseHorizon</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>mHorizonNAz</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <point>
+      <x>120</x>
+      <y>380</y>
+     </point>
+    </hint>
+    <hint type="destinationlabel">
+     <point>
+      <x>320</x>
+      <y>380</y>
+     </point>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

@@ -1,0 +1,21 @@
+[general]
+name=Solar Radiation (sun)
+qgisMinimumVersion=3.34
+description=GPU-accelerated solar radiation (r.sun model port) from DEMs
+about=Wraps the `sun` Rust/WebGPU implementation of the GRASS r.sun clear-sky
+    solar irradiation model. Computes daily beam/diffuse/reflected/global
+    irradiation and sunshine duration, or annual photovoltaic potential, from
+    a digital elevation model. CPU (rayon-parallel) and GPU (wgpu compute
+    shader) backends produce equivalent results.
+version=0.1.0
+author=Raphael
+email=raphael@example.com
+
+hasProcessingProvider=no
+tags=solar,radiation,irradiation,sun,r.sun,photovoltaic,gpu,dem,terrain
+category=Raster
+icon=icon.png
+experimental=True
+deprecated=False
+server=False
+hasPluginReloadButton=False
