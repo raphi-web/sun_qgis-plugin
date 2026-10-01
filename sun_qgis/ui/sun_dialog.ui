@@ -28,9 +28,9 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QgsFileWidget" name="mElevation">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mElevation">
+        <property name="showCrs">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
@@ -42,9 +42,12 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QgsFileWidget" name="mSlope">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mSlope">
+        <property name="showCrs">
+         <bool>false</bool>
+        </property>
+        <property name="allowEmptyLayer">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -56,9 +59,12 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QgsFileWidget" name="mAspect">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mAspect">
+        <property name="showCrs">
+         <bool>false</bool>
+        </property>
+        <property name="allowEmptyLayer">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -70,9 +76,12 @@
        </widget>
       </item>
       <item row="3" column="1">
-       <widget class="QgsFileWidget" name="mLinkeRaster">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mLinkeRaster">
+        <property name="showCrs">
+         <bool>false</bool>
+        </property>
+        <property name="allowEmptyLayer">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -84,9 +93,12 @@
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="QgsFileWidget" name="mAlbedoRaster">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mAlbedoRaster">
+        <property name="showCrs">
+         <bool>false</bool>
+        </property>
+        <property name="allowEmptyLayer">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -98,9 +110,12 @@
        </widget>
       </item>
       <item row="5" column="1">
-       <widget class="QgsFileWidget" name="mMask">
-        <property name="filter">
-         <string>Raster files (*.tif *.tiff *.img *.asc *.vrt)</string>
+       <widget class="QgsMapLayerComboBox" name="mMask">
+        <property name="showCrs">
+         <bool>false</bool>
+        </property>
+        <property name="allowEmptyLayer">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -449,6 +464,26 @@
         </property>
        </widget>
       </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QProgressBar" name="mProgress">
+        <property name="value">
+         <number>0</number>
+        </property>
+        <property name="visible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QLabel" name="mStatus">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="visible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -470,29 +505,14 @@
    <extends>QWidget</extends>
    <header>qgsfilewidget.h</header>
   </customwidget>
+  <customwidget>
+   <class>QgsMapLayerComboBox</class>
+   <extends>QComboBox</extends>
+   <header>qgsmaplayercombobox.h</header>
+  </customwidget>
  </customwidgets>
  <resources/>
  <connections>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>accepted()</signal>
-   <receiver>SunDialogBase</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <point>
-      <x>248</x>
-      <y>254</y>
-     </point>
-    </hint>
-    <hint type="destinationlabel">
-     <point>
-      <x>157</x>
-      <y>274</y>
-     </point>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>buttonBox</sender>
    <signal>rejected()</signal>

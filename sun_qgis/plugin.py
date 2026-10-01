@@ -1,20 +1,16 @@
-"""Plugin entry point — toolbar action + dialog wiring (thin glue)."""
+"""Plugin entry point — toolbar action + dialog wiring (thin glue).
+
+The dialog owns the computation lifecycle (Run button, progress bar, task);
+the plugin only opens it and hooks result loading into the project.
+"""
 
 import os
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsProject,
-    QgsRasterLayer,
-)
-from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.core import QgsProject, QgsRasterLayer
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-from . import core
-from .sun_dialog import SunDialog, form_from_dialog
-from .task import SunComputationTask
+from .sun_dialog import SunDialog
 
 PLUGIN_DIR = os.path.dirname(__file__)
 
@@ -23,8 +19,7 @@ class SunPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.action = None
-        self._sun = None
-        self._task = None
+        self.dlg = None
 
     def initGui(self):
         icon_path = os.path.join(PLUGIN_DIR, "icon.png")
@@ -41,36 +36,17 @@ class SunPlugin:
             self.action = None
 
     def run(self):
-        dlg = SunDialog(self.iface.mainWindow())
-        if dlg.exec_():
-            self.start_computation(form_from_dialog(dlg))
-
-    def start_computation(self, form):
-        try:
-            sun = core.load_sun(PLUGIN_DIR)
-        except Exception as e:
-            self._fail(f"Could not load the sun extension:\n{e}")
-            return
-
-        task = SunComputationTask("Solar radiation computation", sun, form)
-        task.taskCompleted.connect(lambda result, t=task: self._on_finished(t, form))
-        self._task = task  # keep a reference; task manager owns it meanwhile
-        QgsApplication.taskManager().addTask(task)
-
-    def _on_finished(self, task, form):
-        self._task = None
-        if not task.outputs:
-            self._fail(task.error_message or "Computation failed.")
-            return
-        self._add_layers(task.outputs)
-        self.iface.messageBar().pushMessage(
-            "Solar radiation",
-            f"Finished — {len(task.outputs)} raster(s) written.",
-            level=Qgis.Success,
-            duration=5,
-        )
+        if self.dlg is None:
+            self.dlg = SunDialog(self.iface.mainWindow())
+            self.dlg.finished_ok = self._add_layers
+        self.dlg.show()
+        self.dlg.raise_()
+        self.dlg.activateWindow()
 
     def _add_layers(self, paths):
+        add = self.dlg.mAddToProject.isChecked() if self.dlg else True
+        if not add:
+            return
         project = QgsProject.instance()
         root = project.layerTreeRoot()
         for path in paths:
@@ -79,6 +55,3 @@ class SunPlugin:
             if layer.isValid():
                 project.addMapLayer(layer, False)
                 root.insertLayer(0, layer)
-
-    def _fail(self, message):
-        QMessageBox.critical(self.iface.mainWindow(), "Solar Radiation (sun)", message)

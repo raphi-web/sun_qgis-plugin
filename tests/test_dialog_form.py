@@ -2,6 +2,7 @@
 
 The real dialog needs Qt/QGIS; form_from_dialog only reads attributes, so a
 SimpleNamespace with the same widget surface is enough to test the mapping.
+Inputs are QgsMapLayerComboBox (currentLayer() -> layer.source()).
 """
 from types import SimpleNamespace
 
@@ -23,6 +24,20 @@ def dialog_module(core):
     sys.modules["sunqgis.sun_dialog"] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def _layer(source):
+    return SimpleNamespace(source=lambda: source, isValid=lambda: True)
+
+
+class _LayerCombo:
+    """Fake QgsMapLayerComboBox."""
+
+    def __init__(self, layer=None):
+        self._layer = layer
+
+    def currentLayer(self):
+        return self._layer
 
 
 class _FileWidget:
@@ -51,12 +66,12 @@ class _CheckWidget:
 
 def _fake_dialog(**over):
     d = SimpleNamespace(
-        mElevation=_FileWidget("/data/dem.tif"),
-        mSlope=_FileWidget(""),
-        mAspect=_FileWidget(""),
-        mLinkeRaster=_FileWidget(""),
-        mAlbedoRaster=_FileWidget(""),
-        mMask=_FileWidget(""),
+        mElevation=_LayerCombo(_layer("/data/dem.tif")),
+        mSlope=_LayerCombo(None),
+        mAspect=_LayerCombo(None),
+        mLinkeRaster=_LayerCombo(None),
+        mAlbedoRaster=_LayerCombo(None),
+        mMask=_LayerCombo(None),
         mOutputDir=_FileWidget("/out"),
         mPrefix=SimpleNamespace(text=lambda: "sol"),
         tabModes=SimpleNamespace(currentIndex=lambda: 0),
@@ -96,16 +111,32 @@ def test_daily_tab_maps_to_daily_form(dialog_module):
     assert form["output_dir"] == "/out"
     assert form["output_prefix"] == "sol"
     assert form["gpu"] is True
-    # empty optional file widgets become None, not ""
+    # unselected optional layer combos become None
     assert form["slope"] is None
     assert form["mask"] is None
 
 
-def test_optional_raster_paths_forwarded(dialog_module):
+def test_optional_layer_paths_forwarded(dialog_module):
     form = dialog_module.form_from_dialog(
-        _fake_dialog(mSlope=_FileWidget("/data/slope.tif"))
+        _fake_dialog(mSlope=_LayerCombo(_layer("/data/slope.tif")))
     )
     assert form["slope"] == "/data/slope.tif"
+
+
+def test_layer_subdataset_suffix_is_stripped(dialog_module):
+    """QGIS appends '|layername=…' to some sources; the native engine opens
+    plain paths, so the suffix must be removed."""
+    form = dialog_module.form_from_dialog(
+        _fake_dialog(
+            mElevation=_LayerCombo(_layer("/data/dem.gpkg|layername=band 1"))
+        )
+    )
+    assert form["elevation"] == "/data/dem.gpkg"
+
+
+def test_no_elevation_layer_gives_empty_string_for_validation(dialog_module):
+    form = dialog_module.form_from_dialog(_fake_dialog(mElevation=_LayerCombo(None)))
+    assert form["elevation"] == ""
 
 
 def test_annual_tab_maps_to_annual_form(dialog_module):

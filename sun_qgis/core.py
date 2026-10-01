@@ -3,8 +3,105 @@
 Kept import-safe headless: QGIS-dependent glue lives in plugin.py / task.py.
 """
 
+import os
+import re
+import select
 import sys
+import threading
 from pathlib import Path
+
+_PROGRESS_RE = re.compile(r"Progress:\s*(\d+)%")
+
+
+def parse_progress_line(line):
+    """Extract a 0-100 float from a native progress line, else None.
+
+    The Rust engine prints e.g. 'CPU annual  Progress: 12%' (CPU paths) and
+    unstructured info lines on the GPU paths ('GPU  Tile N: …' → None).
+    """
+    m = _PROGRESS_RE.search(line)
+    return float(m.group(1)) if m else None
+
+
+def run_capturing_stderr(work, on_progress, echo=None, poll_interval=0.1):
+    """Run *work()* (blocking native call) while capturing C-level stderr.
+
+    The native extension writes progress to fd 2 (Rust eprint!), which
+    Python's sys.stderr swap cannot see — so fd 2 is redirected into a pipe,
+    work runs on a worker thread, and this thread parses the pipe stream:
+
+    * lines containing 'Progress: NN%' → on_progress(NN.0)
+    * anything else → echo(bytes); defaults to the original stderr fd
+
+    fd 2 is restored in a finally block even when *work* raises; the
+    exception propagates. Returns work()'s result.
+    """
+    saved_err = os.dup(2)
+    read_fd, write_fd = os.pipe()
+    os.dup2(write_fd, 2)
+    os.close(write_fd)
+
+    def _emit(raw_bytes):
+        if echo is not None:
+            echo(raw_bytes)
+        else:
+            os.write(saved_err, raw_bytes)
+
+    result_box = {}
+
+    def _worker():
+        try:
+            result_box["value"] = work()
+        except BaseException as e:  # re-raised on this thread after cleanup
+            result_box["error"] = e
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+
+    buf = b""
+    try:
+        while True:
+            alive = thread.is_alive()
+            ready, _, _ = select.select([read_fd], [], [], poll_interval)
+            if ready:
+                chunk = os.read(read_fd, 65536)
+                if not chunk and not alive:
+                    break
+                buf += chunk
+                # \r and \n both delimit progress reports (eprint! uses \r).
+                while True:
+                    idx_n = buf.find(b"\n")
+                    idx_r = buf.find(b"\r")
+                    cands = [i for i in (idx_n, idx_r) if i >= 0]
+                    if not cands:
+                        break
+                    idx = min(cands)
+                    segment, buf = buf[:idx], buf[idx + 1:]
+                    text = segment.decode("utf-8", errors="replace")
+                    pct = parse_progress_line(text)
+                    if pct is not None:
+                        on_progress(pct)
+                    elif segment:
+                        _emit(segment + b"\n")
+            elif not alive:
+                break
+        if buf:
+            text = buf.decode("utf-8", errors="replace")
+            pct = parse_progress_line(text)
+            if pct is not None:
+                on_progress(pct)
+            else:
+                _emit(buf)
+        thread.join()
+    finally:
+        os.dup2(saved_err, 2)
+        os.close(saved_err)
+        os.close(read_fd)
+
+    if "error" in result_box:
+        raise result_box["error"]
+    return result_box.get("value")
+
 
 REQUIRED_API = ("compute_raster", "compute_annual_potential", "create_dummy")
 

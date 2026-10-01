@@ -119,3 +119,29 @@ class _FakeBrokenSun:
 
     def compute_annual_potential(self, **kw):
         raise RuntimeError("boom")
+
+
+def test_progress_callback_receives_updates(task_module, sun_module, dem_path, tmp_path):
+    """With a progress_cb, run_sun_task must stream 0..100 updates parsed
+    from the native engine's stderr, and switch quiet=False internally."""
+    seen = []
+    form = _daily_form(dem_path, tmp_path, output_prefix="prog")
+    task_module.run_sun_task(sun_module, form, progress_cb=seen.append)
+    assert seen, "no progress updates received"
+    assert seen[-1] >= 0.0
+    assert all(0.0 <= p <= 100.0 for p in seen)
+
+
+def test_no_progress_cb_keeps_quiet(task_module):
+    """Without a callback the native call stays quiet (no fd-2 capture)."""
+    fake = _RecordingSun()
+    form = _daily_form("/data/dem.tif", "/tmp", output_prefix="q")
+    task_module.run_sun_task(fake, form)
+    assert fake.calls[0][1]["quiet"] is True
+
+
+def test_with_progress_cb_disables_quiet(task_module):
+    fake = _RecordingSun()
+    form = _daily_form("/data/dem.tif", "/tmp", output_prefix="q")
+    task_module.run_sun_task(fake, form, progress_cb=lambda p: None)
+    assert fake.calls[0][1]["quiet"] is False
