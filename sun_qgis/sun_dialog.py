@@ -103,6 +103,13 @@ class SunDialog(QDialog):
         ):
             combo.setFilters(QgsMapLayerProxyModel.RasterLayer)
 
+        # Elevation keeps whatever QGIS preselected (usually the active
+        # layer); the optional inputs must start empty — silently computing
+        # against some random preselected slope/mask would be worse than
+        # forcing an explicit choice.
+        for name, _ in _OPTIONAL_COMBOS:
+            getattr(self, name).setLayer(None)
+
         self._run_computation = run_computation
         self._task = None
 

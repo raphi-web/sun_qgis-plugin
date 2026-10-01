@@ -46,6 +46,13 @@ def test_daily_gpu_reports_progress_percentages(core, sun_module, dem_path, tmp_
     assert seen, "GPU daily path emitted no Progress: N% reports"
     assert seen[-1] == 100.0
     assert all(0.0 <= p <= 100.0 for p in seen)
+    # A single-tile run must still stream intermediate phases, not just 100%.
+    assert len(seen) >= 2, (
+        f"only {seen} reported — single-tile GPU runs should emit phase "
+        f"checkpoints (post-setup, post-dispatch) before the final 100%"
+    )
+    assert seen[0] < 100.0
+    assert all(b >= a for a, b in zip(seen, seen[1:])), f"not monotonic: {seen}"
 
 
 @pytest.mark.gpu
