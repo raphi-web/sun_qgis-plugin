@@ -2,3 +2,7 @@ target/
 __pycache__/
 *.pyc
 .pytest_cache/
+# Binary data files
+*.tif
+*.aux.xml
+example/
