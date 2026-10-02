@@ -12,7 +12,7 @@ about=Compute clear-sky solar irradiation and photovoltaic potential directly
     slope and aspect effects, atmospheric turbidity (Linke) and ground albedo
     are all modeled; slope and aspect are derived automatically from the DEM
     when not supplied. Runs on CPU alone if no GPU is present.
-version=0.1.0
+version=0.1.1
 author=Raphael Prinz
 email=raphael.prinz1993@gmail.com
 
