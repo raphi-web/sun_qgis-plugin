@@ -1,24 +1,29 @@
 [general]
 name=Solar Radiation
 qgisMinimumVersion=3.34
-description=Fast GPU-accelerated solar radiation and photovoltaic potential from elevation models
+description=Fast solar radiation and photovoltaic potential maps from elevation models, with GPU acceleration
 about=Compute clear-sky solar irradiation and photovoltaic potential directly
-    inside QGIS from any digital elevation model. Choose between a single-day
+    inside QGIS from any digital elevation model (DEM). Choose a single-day
     irradiation map (beam, diffuse, reflected, global, sunshine duration) or
-    an annual PV potential map with custom panel efficiency. GPU acceleration
-    makes continent-scale DEMs practical — a 1600×1600 pixel run finishes in
-    seconds on a modern laptop. Optional slope, aspect, atmospheric turbidity
-    (Linke), and ground albedo rasters refine the model; when omitted, slope
-    and aspect are derived automatically from the DEM.
+    an annual PV potential map with custom panel efficiency. Built for large
+    rasters: computation streams through memory-bounded tiles and a GPU path
+    speeds annual whole-year simulations by an order of magnitude — a
+    1000×1000 annual run takes seconds instead of minutes. Terrain shadowing,
+    slope and aspect effects, atmospheric turbidity (Linke) and ground albedo
+    are all modeled; slope and aspect are derived automatically from the DEM
+    when not supplied. Runs on CPU alone if no GPU is present.
 version=0.1.0
-author=Raphael
-email=raphael@example.com
+author=Raphael Prinz
+email=raphael.prinz1993@gmail.com
 
 hasProcessingProvider=no
-tags=solar,radiation,irradiation,photovoltaic,pv,dem,elevation,terrain,gpu,sunshine
+tags=solar,radiation,irradiation,photovoltaic,pv,dem,elevation,terrain,gpu,sunshine,shadow,r.sun
 category=Raster
 icon=icon.png
 experimental=True
 deprecated=False
 server=False
 hasPluginReloadButton=False
+homepage=https://github.com/raphi-web/sun-solar-radiation
+repository=https://github.com/raphi-web/sun-solar-radiation
+tracker=https://github.com/raphi-web/sun-solar-radiation/issues

@@ -103,3 +103,25 @@ def test_readme_has_parameter_docs(readme_text):
     required = ["linke", "albedo", "slope", "aspect"]
     missing = [term for term in required if term.lower() not in lower]
     assert not missing, f"README missing parameter docs: {missing}"
+
+
+def test_no_placeholder_metadata(readme_text, metadata_text):
+    """Release docs must not ship template placeholders."""
+    for text, name in ((readme_text, "README"), (metadata_text, "metadata")):
+        for placeholder in ("yourusername", "example.com", "Your Name",
+                            "<repository-url>"):
+            assert placeholder not in text, f"{name} contains placeholder {placeholder!r}"
+
+
+def test_readme_troubleshooting_matches_gdal_free_extension(readme_text):
+    """The extension no longer links GDAL — troubleshooting must not tell
+    users to verify GDAL linkage (stale advice from the old architecture)."""
+    assert "ldd" not in readme_text or "grep gdal" not in readme_text, (
+        "README still tells users to check GDAL linkage of the extension"
+    )
+
+
+def test_readme_documents_aspect_convention(readme_text):
+    """The engine uses GRASS aspect convention (0=E, CCW). Documenting the
+    wrong convention silently corrupts user-supplied aspect rasters."""
+    assert "grass" in readme_text.lower(), "aspect convention undocumented"
