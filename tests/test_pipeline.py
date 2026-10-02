@@ -246,3 +246,79 @@ def test_validation_errors_propagate(sun_module, pipeline, walled_dem, tmp_path)
     form["day"] = 999
     with pytest.raises(ValueError, match="Day of year"):
         pipeline.run_tiled(sun_module, form)
+
+
+@pytest.fixture(scope="module")
+def gpu_flag(sun_module):
+    return bool(sun_module.gpu_available())
+
+
+def test_gpu_form_flag_reaches_native_call(sun_module, pipeline, walled_dem, tmp_path, monkeypatch):
+    """form['gpu']=True must be passed to the native band call (the dialog's
+    GPU checkbox is honored), and False keeps the CPU path."""
+    out = tmp_path / "gpuflag"
+    out.mkdir()
+    seen = []
+    real = sun_module.compute_raster_bands
+
+    def spy(**kw):
+        seen.append(kw["gpu"])
+        return real(**kw)
+
+    monkeypatch.setattr(sun_module, "compute_raster_bands", spy)
+    pipeline.run_tiled(sun_module, _daily_form(walled_dem, out, gpu=True), band_rows=10)
+    assert seen and all(g is True for g in seen)
+
+    seen.clear()
+    out2 = tmp_path / "gpuflag2"
+    out2.mkdir()
+    pipeline.run_tiled(sun_module, _daily_form(walled_dem, out2, gpu=False), band_rows=10)
+    assert seen and all(g is False for g in seen)
+
+
+def test_gpu_run_produces_same_shape_and_nodata(sun_module, pipeline, walled_dem, tmp_path, gpu_flag):
+    """A gpu=True run writes the same georeferenced output with the same
+    nodata placement as gpu=False (values may differ at shadow terminators)."""
+    if not gpu_flag:
+        pytest.skip("no wgpu adapter")
+    cpu_dir = tmp_path / "gcpu"
+    gpu_dir = tmp_path / "ggpu"
+    cpu_dir.mkdir()
+    gpu_dir.mkdir()
+    p1 = pipeline.run_tiled(sun_module, _daily_form(walled_dem, cpu_dir, gpu=False), band_rows=7)
+    p2 = pipeline.run_tiled(sun_module, _daily_form(walled_dem, gpu_dir, gpu=True), band_rows=7)
+    d1 = gdal.Open(p1[0])
+    a = d1.GetRasterBand(1).ReadAsArray()
+    d2 = gdal.Open(p2[0])
+    b = d2.GetRasterBand(1).ReadAsArray()
+    d1 = d2 = None
+    assert np.array_equal(a == UNDEFZ, b == UNDEFZ)
+    valid = a != UNDEFZ
+    rel = np.abs(b[valid] - a[valid]) / np.abs(a[valid]).clip(1.0)
+    # This fixture is shadow-terminator-dominated (huge wall, low winter
+    # sun), so f32-shader vs f64-CPU ray-march flips a noticeable MINORITY
+    # of pixels fully shaded/unshaded (rel == 1.0). The contract here is
+    # pass-through, not precision (that's test_gpu_array_api): most pixels
+    # must agree closely, and hard flips stay a small fraction.
+    assert (rel < 0.02).mean() > 0.8, f"only {(rel < 0.02).mean():.2%} of pixels agree"
+    assert (rel > 0.5).mean() < 0.15, f"{(rel > 0.5).mean():.2%} of pixels hard-flipped"
+
+
+def test_gpu_falls_back_to_cpu_when_unavailable(sun_module, pipeline, walled_dem, tmp_path, monkeypatch):
+    """When gpu_available() is False (no adapter/drivers), a gpu=True form
+    must still compute — silently falling back to the CPU path."""
+    out = tmp_path / "fallback"
+    out.mkdir()
+    monkeypatch.setattr(sun_module, "gpu_available", lambda: False)
+    seen = []
+    real = sun_module.compute_raster_bands
+
+    def spy(**kw):
+        seen.append(kw["gpu"])
+        return real(**kw)
+
+    monkeypatch.setattr(sun_module, "compute_raster_bands", spy)
+    paths = pipeline.run_tiled(sun_module, _daily_form(walled_dem, out, gpu=True), band_rows=10)
+    assert seen and all(g is False for g in seen), "must fall back to CPU"
+    import os
+    assert os.path.exists(paths[0])

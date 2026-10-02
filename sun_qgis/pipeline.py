@@ -76,17 +76,29 @@ def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS):
     shadow_flat = _flat(elev_full)
     plan = band_plan(nrows, band_rows)
 
+    # Honor the dialog's GPU checkbox, but only when an adapter actually
+    # exists — silently fall back to CPU otherwise (headless servers, missing
+    # Vulkan drivers). Probe once per run.
+    use_gpu = bool(form.get("gpu")) and _gpu_available(sun)
+
     if form.get("mode") == "annual":
         paths = _run_annual_bands(sun, form, meta, plan, ncols, nrows,
                                   elev_full, lats, shadow_flat,
                                   derived_slope, derived_aspect,
-                                  dx_m, dy_m, progress_cb)
+                                  dx_m, dy_m, progress_cb, use_gpu)
     else:
         paths = _run_daily_bands(sun, form, meta, plan, ncols, nrows,
                                  elev_full, lats, shadow_flat,
                                  derived_slope, derived_aspect,
-                                 dx_m, dy_m, progress_cb)
+                                 dx_m, dy_m, progress_cb, use_gpu)
     return paths
+
+
+def _gpu_available(sun):
+    """Adapter probe; old extensions without gpu_available() are treated as
+    CPU-only (the native call would reject gpu=True)."""
+    probe = getattr(sun, "gpu_available", None)
+    return bool(probe()) if probe is not None else False
 
 
 def _read_optional(form, key, start, end, ncols, nrows, derived):
@@ -102,7 +114,7 @@ def _read_optional(form, key, start, end, ncols, nrows, derived):
 
 def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                      shadow_flat, derived_slope, derived_aspect,
-                     dx_m, dy_m, progress_cb):
+                     dx_m, dy_m, progress_cb, use_gpu):
     from pathlib import Path
 
     out_dir = Path(str(form["output_dir"]))
@@ -142,7 +154,7 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                 row_offset=start,
                 full_nrows=nrows,
                 outputs=[k for k, _ in wanted],
-                gpu=False,  # array API is CPU; GUI responsiveness via GIL release
+                gpu=use_gpu,  # adapter-probed; CPU fallback when unavailable
                 quiet=True,
             )
             for native_key, _ in wanted:
@@ -159,7 +171,7 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
 
 def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                       shadow_flat, derived_slope, derived_aspect,
-                      dx_m, dy_m, progress_cb):
+                      dx_m, dy_m, progress_cb, use_gpu):
     from pathlib import Path
 
     out_dir = Path(str(form["output_dir"]))
@@ -191,7 +203,7 @@ def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                 shadow_context_elev=shadow_flat,
                 row_offset=start,
                 full_nrows=nrows,
-                gpu=False,
+                gpu=use_gpu,
                 use_horizon=bool(form.get("use_horizon")),
                 horizon_n_az=int(form.get("horizon_n_az", 64)),
                 quiet=True,
