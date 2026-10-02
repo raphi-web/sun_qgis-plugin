@@ -1,66 +1,59 @@
-"""QgsTask wrapper around the native sun extension.
+"""QgsTask wrapper around the tiled sun pipeline.
 
-run_sun_task(sun, form) is the testable core: validates, builds kwargs,
-dispatches to the right native function, returns the list of written files.
-SunComputationTask is QGIS glue (progress + cancellation surface).
+run_sun_task(sun, form) is the testable core: validates the form, delegates
+to pipeline.run_tiled (Python GDAL I/O around the native array API), and
+returns the list of written files. SunComputationTask is QGIS glue
+(progress + cancellation surface).
 """
 
 from qgis.core import QgsTask
 
-from . import core
+from . import pipeline
 
 
-def run_sun_task(sun, form, progress_cb=None):
-    """Validate *form*, run the matching sun computation, return output paths.
+def run_sun_task(sun, form, progress_cb=None, band_rows=None):
+    """Validate *form*, run the tiled computation, return output paths.
 
-    When *progress_cb* is given, the native engine runs with quiet=False and
-    its C-level stderr progress reports ('Progress: NN%') are streamed to
-    progress_cb(percent_float) via core.run_capturing_stderr.
+    *progress_cb* (if given) receives monotonically increasing 0..100 floats,
+    reported by the pipeline after each completed row band — no stderr
+    capture needed, since the native calls run quiet and the band loop
+    drives progress from Python.
 
-    Raises ValueError with the validation errors joined; native failures
-    (RuntimeError from the extension) propagate untouched.
+    *band_rows* optionally overrides the pipeline's default band height
+    (rows processed per native call; smaller = less memory for optional
+    inputs/outputs on huge DEMs).
+
+    Raises ValueError with the validation errors joined; native/IO failures
+    propagate untouched.
     """
-    errors = core.validate_form(form)
-    if errors:
-        raise ValueError("\n".join(errors))
-
-    if form.get("mode") == "annual":
-        kwargs = core.build_annual_kwargs(form)
-        dispatch = sun.compute_annual_potential
-        outputs = [kwargs["out_path"]]
-    else:
-        kwargs = core.build_daily_kwargs(form)
-        dispatch = sun.compute_raster
-        outputs = [
-            kwargs[k] for _, k, _ in core.DAILY_OUTPUTS if kwargs[k] is not None
-        ]
-
-    if progress_cb is None:
-        dispatch(**kwargs)  # kwargs already carry quiet=True
-    else:
-        kwargs["quiet"] = False
-        core.run_capturing_stderr(lambda: dispatch(**kwargs), progress_cb)
-    return outputs
+    kwargs = {"progress_cb": progress_cb}
+    if band_rows is not None:
+        kwargs["band_rows"] = int(band_rows)
+    return pipeline.run_tiled(sun, form, **kwargs)
 
 
 class SunComputationTask(QgsTask):
     """Runs run_sun_task off the GUI thread; stores results on the task.
 
-    Progress: the native 'Progress: NN%' reports are forwarded via
+    Progress: the pipeline's per-band callbacks are forwarded via
     task.setProgress() (thread-safe; the GUI sees progressChanged).
     """
 
-    def __init__(self, description, sun, form):
+    def __init__(self, description, sun, form, band_rows=None):
         super().__init__(description, QgsTask.CanCancel)
         self.sun = sun
         self.form = form
+        self.band_rows = band_rows
         self.outputs = []
         self.error_message = None
 
     def run(self):
         try:
             self.outputs = run_sun_task(
-                self.sun, self.form, progress_cb=self.setProgress
+                self.sun,
+                self.form,
+                progress_cb=self.setProgress,
+                band_rows=self.band_rows,
             )
             return True
         except Exception as e:  # surfaced to the GUI thread in finished()
