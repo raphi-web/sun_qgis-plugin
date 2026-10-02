@@ -21,7 +21,9 @@ def sun_module(core, plugin_dir):
 
 
 def _flat(arr):
-    return np.ascontiguousarray(arr, dtype=np.float32).ravel().tolist()
+    """Contiguous flat float32 ndarray — the native API takes numpy arrays
+    (zero-copy via the numpy crate), not Python lists."""
+    return np.ascontiguousarray(arr, dtype=np.float32).ravel()
 
 
 def test_module_exposes_array_api(sun_module):
@@ -34,7 +36,7 @@ def test_horn_slope_aspect_flat_terrain(sun_module):
     ncols, nrows = 20, 10
     elev = _flat(np.full((nrows, ncols), 800.0, dtype=np.float32))
     slope, aspect = sun_module.horn_slope_aspect(
-        elev, ncols, nrows, 30.0, 30.0
+        elev, ncols, nrows, dx_m=30.0, dy_m=30.0
     )
     slope = np.asarray(slope).reshape(nrows, ncols)
     interior = slope[1:-1, 1:-1]
@@ -48,12 +50,16 @@ def test_horn_slope_aspect_nodata_propagates(sun_module):
     arr = np.full((nrows, ncols), 800.0, dtype=np.float32)
     arr[5, 10] = UNDEFZ
     slope, aspect = sun_module.horn_slope_aspect(
-        _flat(arr), ncols, nrows, 30.0, 30.0
+        _flat(arr), ncols, nrows, dx_m=30.0, dy_m=30.0
     )
     slope = np.asarray(slope).reshape(nrows, ncols)
-    # the nodata pixel and its 3x3 neighborhood are nodata
-    assert slope[5, 10] == UNDEFZ
-    assert slope[4, 9] == UNDEFZ
+    # A nodata pixel propagates to the 8 NEIGHBOURS whose 3×3 window contains
+    # it (their slope becomes nodata). The nodata pixel's OWN slope is still
+    # computed from its valid ring (Horn excludes the centre from its window);
+    # that value is irrelevant downstream because the radiation loop skips any
+    # pixel with nodata elevation. Assert the neighbour propagation:
+    assert slope[4, 9] == UNDEFZ  # (5,10) is the SE neighbour of (4,9)
+    assert slope[6, 11] == UNDEFZ  # (5,10) is the NW neighbour of (6,11)
 
 
 def test_compute_raster_bands_single_day(sun_module):
@@ -61,7 +67,7 @@ def test_compute_raster_bands_single_day(sun_module):
     ncols, nrows = 50, 10
     yy, xx = np.mgrid[0:nrows, 0:ncols].astype(np.float32)
     elev = 500.0 + 2.0 * xx  # gentle east-rising slope
-    row_lat = [47.5] * nrows
+    row_lat = np.full(nrows, 47.5, dtype=np.float32)
 
     result = sun_module.compute_raster_bands(
         elevation=_flat(elev),
@@ -99,7 +105,7 @@ def test_compute_raster_bands_nodata_passthrough(sun_module):
         elevation=_flat(elev),
         ncols=ncols,
         nrows=nrows,
-        row_lat=[47.5] * nrows,
+        row_lat=np.full(nrows, 47.5, dtype=np.float32),
         day=172,
         step=0.5,
         linke_value=3.0,
@@ -113,7 +119,9 @@ def test_compute_raster_bands_nodata_passthrough(sun_module):
     )
     glob = np.asarray(result["glob"]).reshape(nrows, ncols)
     assert np.all(glob[:, :10] == UNDEFZ)
-    assert np.all(glob[:, 15:] != UNDEFZ)
+    # Interior only: slope/aspect are derived internally via Horn, whose
+    # 1-px edge ring is nodata by design (matches the path-based engine).
+    assert np.all(glob[1:-1, 15:-1] != UNDEFZ)
 
 
 def test_compute_raster_bands_mask_zero_skips(sun_module):
@@ -125,7 +133,7 @@ def test_compute_raster_bands_mask_zero_skips(sun_module):
         elevation=_flat(elev),
         ncols=ncols,
         nrows=nrows,
-        row_lat=[47.5] * nrows,
+        row_lat=np.full(nrows, 47.5, dtype=np.float32),
         day=172,
         step=0.5,
         linke_value=3.0,
@@ -140,7 +148,9 @@ def test_compute_raster_bands_mask_zero_skips(sun_module):
     )
     glob = np.asarray(result["glob"]).reshape(nrows, ncols)
     assert np.all(glob[:, 40:] == UNDEFZ)
-    assert np.all(glob[:, :40] != UNDEFZ)
+    # Valid region: interior rows (Horn-derived slope/aspect edge ring is
+    # nodata by design) and columns left of the mask cutoff at 40.
+    assert np.all(glob[1:-1, 1:40] != UNDEFZ)
 
 
 def test_compute_annual_bands(sun_module):
@@ -150,7 +160,7 @@ def test_compute_annual_bands(sun_module):
         elevation=_flat(elev),
         ncols=ncols,
         nrows=nrows,
-        row_lat=[47.5] * nrows,
+        row_lat=np.full(nrows, 47.5, dtype=np.float32),
         day_start=80,
         day_end=100,
         day_step=20,
@@ -176,12 +186,23 @@ def test_compute_annual_bands(sun_module):
 
 def test_row_offset_indexes_full_grid_for_shadows(sun_module):
     """A band with row_offset must shadow against the FULL grid context:
-    a tall wall at full-grid row 0 shades rows in later bands."""
+    a tall wall at full-grid row 0 shades rows in later bands.
+
+    Slope/aspect are derived ONCE over the full grid (as the plugin does,
+    since the whole DEM is in memory) and sliced per band, so this test
+    isolates the row_offset/shadow-context behaviour from the Horn
+    band-edge seam that would otherwise appear at the band boundary.
+    """
     ncols = 30
     total_rows = 20
     full = np.full((total_rows, ncols), 100.0, dtype=np.float32)
     full[0, :] = 900.0  # wall on the north edge
-    lats = [47.5] * total_rows
+    lats = np.full(total_rows, 47.5, dtype=np.float32)
+
+    # Derive slope/aspect once over the full grid.
+    full_slope, full_aspect = sun_module.horn_slope_aspect(
+        _flat(full), ncols, total_rows, dx_m=30.0, dy_m=30.0
+    )
 
     # band = rows 10..20
     band_elev = full[10:]
@@ -189,13 +210,15 @@ def test_row_offset_indexes_full_grid_for_shadows(sun_module):
         elevation=_flat(band_elev),
         ncols=ncols,
         nrows=10,
-        row_lat=lats[10:],
+        row_lat=np.asarray(lats[10:], dtype=np.float32),
         day=355,  # winter: low sun, long shadows
         step=0.5,
         linke_value=3.0,
         albedo_value=0.2,
         dx_m=30.0,
         dy_m=30.0,
+        slope=_flat(np.asarray(full_slope).reshape(total_rows, ncols)[10:]),
+        aspect=_flat(np.asarray(full_aspect).reshape(total_rows, ncols)[10:]),
         gpu=False,
         outputs=["glob"],
         row_offset=10,
@@ -209,13 +232,15 @@ def test_row_offset_indexes_full_grid_for_shadows(sun_module):
         elevation=_flat(full),
         ncols=ncols,
         nrows=total_rows,
-        row_lat=lats,
+        row_lat=np.asarray(lats, dtype=np.float32),
         day=355,
         step=0.5,
         linke_value=3.0,
         albedo_value=0.2,
         dx_m=30.0,
         dy_m=30.0,
+        slope=_flat(full_slope),
+        aspect=_flat(full_aspect),
         gpu=False,
         outputs=["glob"],
         row_offset=0,

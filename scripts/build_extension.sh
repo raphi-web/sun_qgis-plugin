@@ -15,7 +15,11 @@ cd "$RUST_REPO"
 echo "==> Building sun extension against $($QGIS_PYTHON --version 2>&1)…"
 maturin build --release -i "$QGIS_PYTHON" --skip-auditwheel
 
-WHEEL="$(ls -t target/wheels/sun-*-linux_x86_64.whl | head -1)"
+WHEEL="$(ls -t target/wheels/sun_solar_radiation-*-linux_x86_64.whl 2>/dev/null | head -1)"
+if [ -z "$WHEEL" ]; then
+  echo "ERROR: no sun_solar_radiation wheel in target/wheels — did maturin build succeed?" >&2
+  exit 1
+fi
 echo "==> Extracting $WHEEL"
 TMP="$(mktemp -d)"
 unzip -q -o "$WHEEL" -d "$TMP"
