@@ -37,10 +37,10 @@ def sun_module(core, plugin_dir):
 
 
 @pytest.fixture(scope="module")
-def dem_path(sun_module, tmp_path_factory):
-    path = str(tmp_path_factory.mktemp("dem") / "dummy_elevation.tif")
-    sun_module.create_dummy(path)
-    return path
+def dem_path(dummy_dem):
+    """Session-wide synthetic DEM (written by Python GDAL — the extension
+    no longer ships create_dummy)."""
+    return dummy_dem
 
 
 def _daily_form(dem_path, tmp_path, **over):

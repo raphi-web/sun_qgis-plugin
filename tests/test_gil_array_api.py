@@ -22,12 +22,9 @@ def sun_module(core, plugin_dir):
 
 
 @pytest.fixture(scope="module")
-def big_arrays(sun_module, tmp_path_factory):
+def big_arrays(sun_module, dummy_dem):
     """Flat f32 inputs for a 400x400 grid — long enough (~0.3s+) to sample."""
-    tmp = tmp_path_factory.mktemp("gildem")
-    small = str(tmp / "small.tif")
-    sun_module.create_dummy(small)
-    ds = gdal.Open(small)
+    ds = gdal.Open(dummy_dem)
     arr = ds.GetRasterBand(1).ReadAsArray()
     ds = None
 

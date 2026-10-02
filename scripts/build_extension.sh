@@ -3,8 +3,9 @@
 # into the plugin directory.
 #
 # QGIS 3.34 runs Python 3.12 (/usr/bin/python3). maturin must build against
-# THAT interpreter (-i), and --skip-auditwheel keeps the .so linked against
-# the system libgdal.so.34 that QGIS already loads — no 56 MB vendored GDAL.
+# THAT interpreter (-i). The extension is built WITHOUT the gdal-io feature:
+# raster I/O happens in Python, so the .so has no GDAL linkage at all and
+# --skip-auditwheel yields a small, portable binary.
 set -euo pipefail
 
 RUST_REPO="${1:-/home/raphi/Dokumente/Programming/Rust/sun}"
@@ -29,8 +30,13 @@ SO="$(find "$TMP" -name 'sun.cpython-*.so' | head -1)"
 cp "$SO" "$PLUGIN_DIR/"
 rm -rf "$TMP"
 
-echo "==> Verifying linkage (must resolve against system libgdal, no 'not found')"
-ldd "$PLUGIN_DIR/$(basename "$SO")" | grep -E "gdal|not found" || true
+echo "==> Verifying linkage (must NOT link libgdal — extension is GDAL-free)"
+if ldd "$PLUGIN_DIR/$(basename "$SO")" | grep -qi "gdal"; then
+  echo "ERROR: extension links GDAL — build without the gdal-io feature" >&2
+  ldd "$PLUGIN_DIR/$(basename "$SO")" | grep -i gdal >&2
+  exit 1
+fi
+ldd "$PLUGIN_DIR/$(basename "$SO")" | grep "not found" && { echo "ERROR: unresolved libs" >&2; exit 1; } || true
 
 echo "==> Smoke-importing under QGIS's Python…"
 "$QGIS_PYTHON" - <<PYEOF
@@ -38,6 +44,8 @@ import importlib.util
 spec = importlib.util.spec_from_file_location("sun", "$PLUGIN_DIR/$(basename "$SO")")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-assert hasattr(mod, "compute_raster") and hasattr(mod, "compute_annual_potential")
-print("OK: sun extension imports, API present")
+assert hasattr(mod, "compute_raster_bands") and hasattr(mod, "compute_annual_bands")
+assert hasattr(mod, "horn_slope_aspect") and hasattr(mod, "compute_pixel")
+assert not hasattr(mod, "compute_raster"), "path API leaked back into the extension"
+print("OK: sun extension imports, GDAL-free array API present")
 PYEOF

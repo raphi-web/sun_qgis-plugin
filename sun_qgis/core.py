@@ -1,117 +1,30 @@
 """Core logic for the sun_qgis plugin — no qgis imports at module level.
 
-Kept import-safe headless: QGIS-dependent glue lives in plugin.py / task.py.
+Kept import-safe headless: QGIS-dependent glue lives in plugin.py / task.py,
+raster I/O in raster_io.py, and the tiled computation loop in pipeline.py.
 """
 
-import os
-import re
-import select
 import sys
-import threading
 from pathlib import Path
 
-_PROGRESS_RE = re.compile(r"Progress:\s*(\d+)%")
+# The bundled extension is GDAL-free: it exposes only the array API (band-in /
+# band-out) plus the pure single-pixel helper. Raster I/O lives in Python
+# (raster_io.py); if the path-based functions ever come back, they dragged
+# GDAL linkage with them — see tests/test_no_gdal_dependency.py.
+REQUIRED_API = (
+    "compute_raster_bands",
+    "compute_annual_bands",
+    "horn_slope_aspect",
+    "compute_pixel",
+)
 
-
-def parse_progress_line(line):
-    """Extract a 0-100 float from a native progress line, else None.
-
-    The Rust engine prints e.g. 'CPU annual  Progress: 12%' (CPU paths) and
-    unstructured info lines on the GPU paths ('GPU  Tile N: …' → None).
-    """
-    m = _PROGRESS_RE.search(line)
-    return float(m.group(1)) if m else None
-
-
-def run_capturing_stderr(work, on_progress, echo=None, poll_interval=0.1):
-    """Run *work()* (blocking native call) while capturing C-level stderr.
-
-    The native extension writes progress to fd 2 (Rust eprint!), which
-    Python's sys.stderr swap cannot see — so fd 2 is redirected into a pipe,
-    work runs on a worker thread, and this thread parses the pipe stream:
-
-    * lines containing 'Progress: NN%' → on_progress(NN.0)
-    * anything else → echo(bytes); defaults to the original stderr fd
-
-    fd 2 is restored in a finally block even when *work* raises; the
-    exception propagates. Returns work()'s result.
-    """
-    saved_err = os.dup(2)
-    read_fd, write_fd = os.pipe()
-    os.dup2(write_fd, 2)
-    os.close(write_fd)
-
-    def _emit(raw_bytes):
-        if echo is not None:
-            echo(raw_bytes)
-        else:
-            os.write(saved_err, raw_bytes)
-
-    result_box = {}
-
-    def _worker():
-        try:
-            result_box["value"] = work()
-        except BaseException as e:  # re-raised on this thread after cleanup
-            result_box["error"] = e
-
-    thread = threading.Thread(target=_worker, daemon=True)
-    thread.start()
-
-    buf = b""
-    try:
-        while True:
-            alive = thread.is_alive()
-            ready, _, _ = select.select([read_fd], [], [], poll_interval)
-            if ready:
-                chunk = os.read(read_fd, 65536)
-                if not chunk and not alive:
-                    break
-                buf += chunk
-                # \r and \n both delimit progress reports (eprint! uses \r).
-                while True:
-                    idx_n = buf.find(b"\n")
-                    idx_r = buf.find(b"\r")
-                    cands = [i for i in (idx_n, idx_r) if i >= 0]
-                    if not cands:
-                        break
-                    idx = min(cands)
-                    segment, buf = buf[:idx], buf[idx + 1:]
-                    text = segment.decode("utf-8", errors="replace")
-                    pct = parse_progress_line(text)
-                    if pct is not None:
-                        on_progress(pct)
-                    elif segment:
-                        _emit(segment + b"\n")
-            elif not alive:
-                break
-        if buf:
-            text = buf.decode("utf-8", errors="replace")
-            pct = parse_progress_line(text)
-            if pct is not None:
-                on_progress(pct)
-            else:
-                _emit(buf)
-        thread.join()
-    finally:
-        os.dup2(saved_err, 2)
-        os.close(saved_err)
-        os.close(read_fd)
-
-    if "error" in result_box:
-        raise result_box["error"]
-    return result_box.get("value")
-
-
-REQUIRED_API = ("compute_raster", "compute_annual_potential", "create_dummy")
-
-# (form key for the checkbox, compute_raster kwarg name, output filename suffix)
-DAILY_OUTPUTS = (
-    ("want_glob", "glob_rad", "glob"),
-    ("want_beam", "beam_rad", "beam"),
-    ("want_diff", "diff_rad", "diff"),
-    ("want_refl", "refl_rad", "refl"),
-    ("want_insol", "insol_time", "insol"),
+# Form checkboxes for the daily outputs (shared with pipeline._DAILY_MAP).
+DAILY_OUTPUT_WANTS = (
+    "want_glob",
+    "want_beam",
+    "want_diff",
+    "want_refl",
+    "want_insol",
 )
 
 OPTIONAL_RASTERS = ("slope", "aspect", "linke", "albedo", "mask")
@@ -149,7 +62,7 @@ def validate_form(form):
             day = None
         if day is not None and not (1 <= day <= 365):
             errors.append(f"Day of year must be 1-365, got {day}.")
-        if not any(form.get(w) for w, _, _ in DAILY_OUTPUTS):
+        if not any(form.get(w) for w in DAILY_OUTPUT_WANTS):
             errors.append("Select at least one output raster to compute.")
     else:  # annual
         try:
@@ -167,80 +80,6 @@ def validate_form(form):
                 )
 
     return errors
-
-
-def build_daily_kwargs(form):
-    """Translate a dialog form dict into ``sun.compute_raster`` kwargs.
-
-    *form* keys: elevation, day, step, linke_value, albedo_value, output_dir,
-    output_prefix, want_glob/want_beam/want_diff/want_refl/want_insol, gpu,
-    plus optional raster paths (slope, aspect, linke, albedo, mask).
-    Raises ValueError when no output band is selected.
-    """
-    out_dir = str(form["output_dir"])
-    prefix = str(form["output_prefix"])
-
-    kwargs = {
-        "elevation": str(form["elevation"]),
-        "day": int(form["day"]),
-        "step": float(form["step"]),
-        "linke_value": float(form["linke_value"]),
-        "albedo_value": float(form["albedo_value"]),
-        "gpu": bool(form["gpu"]),
-        "quiet": True,
-    }
-    for name in OPTIONAL_RASTERS:
-        path = form.get(name)
-        kwargs[name] = str(path) if path else None
-
-    any_selected = False
-    for want_key, kwarg, suffix in DAILY_OUTPUTS:
-        if form.get(want_key):
-            any_selected = True
-            kwargs[kwarg] = str(Path(out_dir) / f"{prefix}_{suffix}.tif")
-        else:
-            kwargs[kwarg] = None
-    if not any_selected:
-        raise ValueError("Select at least one output raster to compute.")
-    return kwargs
-
-
-def build_annual_kwargs(form):
-    """Translate a dialog form dict into ``sun.compute_annual_potential`` kwargs.
-
-    *form* keys: elevation, day_start, day_end, day_step, step,
-    panel_efficiency, linke_value, albedo_value, output_dir, output_prefix,
-    gpu, use_horizon, horizon_n_az, plus optional raster paths.
-    Raises ValueError on an inverted DOY range.
-    """
-    day_start = int(form["day_start"])
-    day_end = int(form["day_end"])
-    if day_start > day_end:
-        raise ValueError(
-            f"day_start ({day_start}) must be <= day_end ({day_end})."
-        )
-
-    kwargs = {
-        "elevation": str(form["elevation"]),
-        "out_path": str(
-            Path(str(form["output_dir"])) / f"{form['output_prefix']}_potential.tif"
-        ),
-        "day_start": day_start,
-        "day_end": day_end,
-        "day_step": int(form["day_step"]),
-        "step": float(form["step"]),
-        "panel_efficiency": float(form["panel_efficiency"]),
-        "linke_value": float(form["linke_value"]),
-        "albedo_value": float(form["albedo_value"]),
-        "gpu": bool(form["gpu"]),
-        "use_horizon": bool(form["use_horizon"]),
-        "horizon_n_az": int(form["horizon_n_az"]),
-        "quiet": True,
-    }
-    for name in OPTIONAL_RASTERS:
-        path = form.get(name)
-        kwargs[name] = str(path) if path else None
-    return kwargs
 
 
 def load_sun(plugin_dir):

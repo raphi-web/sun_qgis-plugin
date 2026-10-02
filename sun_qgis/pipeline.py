@@ -28,7 +28,7 @@ from .raster_io import (
     write_band,
 )
 
-# daily form checkbox -> (native output key, DAILY_OUTPUTS suffix)
+# daily form checkbox -> (native output key, output filename suffix)
 _DAILY_MAP = {
     "want_glob": ("glob", "glob"),
     "want_beam": ("beam", "beam"),
