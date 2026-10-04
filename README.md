@@ -1,6 +1,24 @@
 # Solar Radiation for QGIS
 
-Compute clear-sky solar irradiation and photovoltaic potential directly inside QGIS from any digital elevation model (DEM). Built for speed: large rasters are processed in memory-bounded tiles, and a GPU compute path makes annual, whole-year simulations practical on a laptop.
+Compute clear-sky solar irradiation and photovoltaic potential directly inside QGIS from any digital elevation model (DEM). Built for speed: a whole-year PV potential map of a 1000×1000 DEM takes about 6 seconds on a laptop's integrated GPU instead of 2 minutes on its CPU, and large rasters are processed in memory-bounded tiles.
+
+## Performance
+
+Measured on a laptop with AMD Ryzen 5 PRO 8540U (12 threads) and integrated Radeon 740M graphics, day 172, 0.5 h time step, global-irradiation output:
+
+| DEM size    | Mode                      | CPU     | GPU    | Speedup |
+|-------------|---------------------------|---------|--------|---------|
+| 500×500     | Daily                     | 0.9 s   | 0.12 s | 7.9×    |
+| 500×500     | Annual (37 sampled days)  | 30 s    | 1.3 s  | 24×     |
+| 1000×1000   | Daily                     | 3.9 s   | 0.32 s | 12×     |
+| 1000×1000   | Annual (37 sampled days)  | 123 s   | 5.5 s  | 22×     |
+| 2000×2000   | Daily                     | 16.5 s  | 1.3 s  | 13×     |
+
+Notes:
+
+- Larger DEMs benefit more — the per-run setup cost amortizes.
+- Memory stays bounded: the DEM is held once, while inputs and outputs stream through in row bands (default 2048 rows), so rasters far larger than free RAM are processable.
+- CPU timings use all cores. A discrete GPU will beat the integrated one above by a further factor.
 
 ## What This Plugin Does
 
@@ -119,24 +137,6 @@ Goal: winter-solstice radiation under hazy air over snow.
 1. Select your DEM; set **Linke** constant = 4.5 and **Albedo** constant = 0.8
 2. **Daily** mode, day = 355; check **Beam** and **Diffuse**
 3. Click **Run**
-
-## Performance
-
-Measured on a laptop with AMD Ryzen 5 PRO 8540U (12 threads) and integrated Radeon 740M graphics, day 172, 0.5 h time step, global-irradiation output:
-
-| DEM size    | Mode                      | CPU     | GPU    | Speedup |
-|-------------|---------------------------|---------|--------|---------|
-| 500×500     | Daily                     | 0.7 s   | 0.13 s | 5.6×    |
-| 500×500     | Annual (37 sampled days)  | 24 s    | 1.4 s  | 17×     |
-| 1000×1000   | Daily                     | 2.9 s   | 0.34 s | 8.8×    |
-| 1000×1000   | Annual (37 sampled days)  | 99 s    | 6.3 s  | 16×     |
-| 2000×2000   | Daily                     | 12.3 s  | 1.4 s  | 8.9×    |
-
-Notes:
-
-- Larger DEMs benefit more — the per-run setup cost amortizes.
-- Memory stays bounded: the DEM is held once, while inputs and outputs stream through in row bands (default 2048 rows), so rasters far larger than free RAM are processable.
-- CPU timings use all cores. A discrete GPU will beat the integrated one above by a further factor.
 
 ## Troubleshooting
 

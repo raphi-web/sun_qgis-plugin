@@ -83,6 +83,12 @@ def test_readme_has_performance_info(readme_text):
         "README doesn't mention performance"
 
 
+def test_readme_leads_with_performance(readme_text):
+    """Speed is the selling point: the benchmark is the first section."""
+    headings = [ln for ln in readme_text.splitlines() if ln.startswith("## ")]
+    assert headings and headings[0] == "## Performance", headings[:3]
+
+
 def test_readme_has_parameter_docs(readme_text):
     """Users need to know what parameters mean. README must document them."""
     lower = readme_text.lower()
