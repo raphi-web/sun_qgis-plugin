@@ -21,8 +21,8 @@ UNDEFZ = -9999.0
 
 
 @pytest.fixture(scope="module")
-def sun_module(core, plugin_dir):
-    return core.load_sun(plugin_dir)
+def sun_module(core):
+    return core.load_sun()
 
 
 @pytest.fixture(scope="module")

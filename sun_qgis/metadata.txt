@@ -12,7 +12,15 @@ about=Compute clear-sky solar irradiation and photovoltaic potential directly
     slope and aspect effects, atmospheric turbidity (Linke) and ground albedo
     are all modeled; slope and aspect are derived automatically from the DEM
     when not supplied. Runs on CPU alone if no GPU is present.
-version=0.1.1
+
+    Requires the Python package sun-solar-radiation (0.1.1 or newer) in
+    QGIS's Python. Windows: in the OSGeo4W Shell run
+    "pip install sun-solar-radiation". macOS: run
+    "/Applications/QGIS.app/Contents/MacOS/python -m pip install sun-solar-radiation".
+    Linux: run "python3 -m pip install --user sun-solar-radiation". Then
+    restart QGIS. Packages exist for Windows x64, macOS Apple Silicon and
+    Linux x86_64; see the README for details.
+version=0.1.2
 author=Raphael Prinz
 email=raphael.prinz1993@gmail.com
 

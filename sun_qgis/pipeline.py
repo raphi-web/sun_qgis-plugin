@@ -46,7 +46,7 @@ def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS):
     """Run the sun computation for *form* with tiled I/O. Returns the list
     of written output paths.
 
-    *sun* is the loaded native extension module (core.load_sun). Raises
+    *sun* is the loaded computation engine module (core.load_sun). Raises
     ValueError on invalid forms; native errors propagate.
     """
     errors = core.validate_form(form)

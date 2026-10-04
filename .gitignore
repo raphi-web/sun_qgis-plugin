@@ -2,8 +2,8 @@ target/
 __pycache__/
 *.pyc
 .pytest_cache/
-# Build outputs: the engine binary is built locally (scripts/build_extension.sh)
-# or fetched from PyPI into the release zip; zips go to GitHub Releases.
+# Build outputs. The computation engine is never kept next to the plugin code
+# (it is the pip package sun-solar-radiation); zips go to GitHub Releases.
 sun_qgis/sun*.so
 sun_qgis/sun*.pyd
 dist/

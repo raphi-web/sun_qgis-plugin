@@ -4,10 +4,13 @@ Kept import-safe headless: QGIS-dependent glue lives in plugin.py / task.py,
 raster I/O in raster_io.py, and the tiled computation loop in pipeline.py.
 """
 
-import sys
-from pathlib import Path
+# The computation engine is the pip package sun-solar-radiation (import name
+# `sun`). The plugin ships no binaries; load_sun() imports the installed one.
+ENGINE_DIST = "sun-solar-radiation"
+# 0.1.1 fixed never-sunlit slopes (nodata) and east aspect computed as north.
+MIN_ENGINE_VERSION = (0, 1, 1)
 
-# The bundled extension is GDAL-free: it exposes only the array API (band-in /
+# The engine is GDAL-free: it exposes only the array API (band-in /
 # band-out) plus the pure single-pixel helper. Raster I/O lives in Python
 # (raster_io.py); if the path-based functions ever come back, they dragged
 # GDAL linkage with them — see tests/test_no_gdal_dependency.py.
@@ -82,62 +85,64 @@ def validate_form(form):
     return errors
 
 
-def find_extension(plugin_dir, suffixes=None):
-    """Return the `sun` engine binary THIS interpreter can import, or None.
+def engine_version():
+    """Installed version of the sun-solar-radiation package, or None."""
+    from importlib import metadata
 
-    The release zip bundles one binary per platform (Linux .so, macOS .so,
-    Windows .pyd). Matching against the interpreter's own extension suffixes
-    (importlib.machinery.EXTENSION_SUFFIXES, most specific first) picks the
-    right one; "the first sun* file" would pick macOS's on Linux.
+    try:
+        return metadata.version(ENGINE_DIST)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _release_tuple(version):
+    """'0.1.2.dev3' -> (0, 1, 2): leading numeric release components only."""
+    parts = []
+    for piece in version.split("."):
+        digits = ""
+        for ch in piece:
+            if not ch.isdigit():
+                break
+            digits += ch
+        if not digits:
+            break
+        parts.append(int(digits))
+        if len(digits) != len(piece):
+            break
+    return tuple(parts)
+
+
+def load_sun():
+    """Import the computation engine (pip package sun-solar-radiation).
+
+    Raises ImportError with the pip command to run when the engine is
+    missing, older than MIN_ENGINE_VERSION, or when some other package
+    named `sun` shadows it.
     """
-    import importlib.machinery
-
-    plugin_dir = Path(plugin_dir)
-    if suffixes is None:
-        suffixes = importlib.machinery.EXTENSION_SUFFIXES
-    for suffix in suffixes:
-        candidate = plugin_dir / f"sun{suffix}"
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def load_sun(plugin_dir):
-    """Import the bundled `sun` native extension from *plugin_dir*.
-
-    Raises FileNotFoundError when no engine binary is present at all, and
-    ImportError naming the found vs needed files when binaries exist but none
-    fits this interpreter (other platform or other Python version).
-    """
-    import importlib.machinery
-    import importlib.util
-
-    plugin_dir = Path(plugin_dir)
-    so_path = find_extension(plugin_dir)
-    if so_path is None:
-        present = sorted(
-            p.name for p in plugin_dir.glob("sun*") if p.suffix in (".so", ".pyd")
-        )
-        if not present:
-            raise FileNotFoundError(
-                f"sun extension not found in {plugin_dir}. Reinstall the plugin "
-                f"from the release zip (it bundles the engine for Linux, Windows "
-                f"and macOS)."
-            )
-        current = sys.version_info
+    try:
+        import sun
+    except ImportError as e:
         raise ImportError(
-            f"No sun extension in {plugin_dir} fits this QGIS "
-            f"(Python {current[0]}.{current[1]}, needs "
-            f"'sun{importlib.machinery.EXTENSION_SUFFIXES[0]}'). "
-            f"Found: {', '.join(present)}."
+            f"The computation engine is not installed ({e}). Install it into "
+            f"QGIS's Python with: pip install {ENGINE_DIST}"
+        ) from e
+
+    missing = [a for a in REQUIRED_API if not hasattr(sun, a)]
+    if missing:
+        where = getattr(sun, "__file__", None) or "<unknown location>"
+        raise ImportError(
+            f"The Python module 'sun' at {where} is not the {ENGINE_DIST} "
+            f"engine (missing {', '.join(missing)}). If it is an older engine "
+            f"build, run: pip install --upgrade {ENGINE_DIST}. If another "
+            f"package named 'sun' is installed, remove it first with: "
+            f"pip uninstall sun"
         )
 
-    # Make the binary importable as module name `sun`.
-    spec = importlib.util.spec_from_file_location("sun", so_path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    missing = [a for a in REQUIRED_API if not hasattr(mod, a)]
-    if missing:
-        raise AttributeError(f"sun extension missing API: {missing}")
-    return mod
+    installed = engine_version()
+    if installed is not None and _release_tuple(installed) < MIN_ENGINE_VERSION:
+        need = ".".join(map(str, MIN_ENGINE_VERSION))
+        raise ImportError(
+            f"{ENGINE_DIST} {installed} is too old (this plugin needs {need} "
+            f"or newer). Run: pip install --upgrade {ENGINE_DIST}"
+        )
+    return sun

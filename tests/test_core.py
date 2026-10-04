@@ -1,13 +1,24 @@
-"""Tests for sun_qgis.core — pure logic + native module loading."""
+"""Tests for sun_qgis.core — pure logic + loading the pip-installed engine."""
+import inspect
+import sys
+import types
+
+import pytest
 
 
-def test_load_sun_returns_module_with_expected_api(core, plugin_dir):
-    """Tracer bullet: the bundled extension imports under QGIS's Python
-    and exposes the array API the plugin calls."""
-    sun = core.load_sun(plugin_dir)
+def test_load_sun_returns_module_with_expected_api(core):
+    """Tracer bullet: the pip-installed engine (sun-solar-radiation) imports
+    under QGIS's Python and exposes the array API the plugin calls."""
+    sun = core.load_sun()
     for attr in core.REQUIRED_API:
         assert hasattr(sun, attr), f"sun module missing {attr}"
     assert callable(sun.compute_raster_bands)
+
+
+def test_load_sun_takes_no_plugin_dir(core):
+    """The engine comes from pip, not from a file next to the plugin.
+    A leftover plugin_dir parameter would invite bundling binaries again."""
+    assert list(inspect.signature(core.load_sun).parameters) == []
 
 
 def test_required_api_is_gdal_free_surface(core):
@@ -22,66 +33,46 @@ def test_required_api_is_gdal_free_surface(core):
         ), f"unexpected entry in REQUIRED_API: {attr}"
 
 
-def test_load_sun_raises_helpful_error_when_extension_missing(core, tmp_path):
-    """A plugin dir without the .so must fail with an actionable message,
-    not a bare ImportError."""
-    import pytest
-
-    with pytest.raises(FileNotFoundError, match="sun extension"):
-        core.load_sun(tmp_path)
-
-
-# The release zip bundles one engine binary per platform. Loading must pick
-# the file THIS interpreter can import, never "the first sun* file".
-_LINUX = "sun.cpython-312-x86_64-linux-gnu.so"
-_MACOS = "sun.cpython-312-darwin.so"
-_WINDOWS = "sun.cp312-win_amd64.pyd"
-
-
-def _multi_platform_dir(core, tmp_path, plugin_dir):
-    import shutil
-
-    real = core.find_extension(plugin_dir)
-    shutil.copy(real, tmp_path / real.name)
-    for foreign in (_MACOS, _WINDOWS):
-        (tmp_path / foreign).write_bytes(b"not a binary for this platform")
-    return tmp_path
-
-
-def test_load_sun_picks_binary_for_this_interpreter(core, plugin_dir, tmp_path):
-    """macOS's file sorts first alphabetically; Linux must still load its own."""
-    d = _multi_platform_dir(core, tmp_path, plugin_dir)
-    sun = core.load_sun(d)
-    assert callable(sun.compute_raster_bands)
-
-
-def test_find_extension_windows_suffixes(core, tmp_path):
-    for name in (_LINUX, _MACOS, _WINDOWS):
-        (tmp_path / name).write_bytes(b"x")
-    found = core.find_extension(tmp_path, suffixes=[".cp312-win_amd64.pyd", ".pyd"])
-    assert found.name == _WINDOWS
-
-
-def test_find_extension_macos_suffixes(core, tmp_path):
-    for name in (_LINUX, _MACOS, _WINDOWS):
-        (tmp_path / name).write_bytes(b"x")
-    found = core.find_extension(
-        tmp_path, suffixes=[".cpython-312-darwin.so", ".abi3.so", ".so"]
-    )
-    assert found.name == _MACOS
-
-
-def test_load_sun_foreign_binaries_only_names_the_mismatch(core, tmp_path):
-    """Binaries exist but none fits this interpreter (e.g. wrong Python
-    version): the error must list what was found and what was needed."""
-    import pytest
-
-    (tmp_path / "sun.cpython-311-x86_64-linux-gnu.so").write_bytes(b"x")
-    (tmp_path / _WINDOWS).write_bytes(b"x")
+def test_engine_not_installed_explains_pip_install(core, monkeypatch):
+    monkeypatch.setitem(sys.modules, "sun", None)  # makes `import sun` fail
     with pytest.raises(ImportError) as exc:
-        core.load_sun(tmp_path)
-    msg = str(exc.value)
-    assert "sun.cpython-311-x86_64-linux-gnu.so" in msg
-    import importlib.machinery
+        core.load_sun()
+    assert "pip install sun-solar-radiation" in str(exc.value)
 
-    assert importlib.machinery.EXTENSION_SUFFIXES[0] in msg
+
+def test_unrelated_sun_module_is_rejected(core, monkeypatch):
+    """Another package named `sun` (e.g. an old pre-release build with the
+    path API) must not be mistaken for the engine."""
+    fake = types.ModuleType("sun")
+    fake.__file__ = "/somewhere/site-packages/sun/__init__.py"
+    fake.compute_raster = lambda *a, **k: None
+    monkeypatch.setitem(sys.modules, "sun", fake)
+    with pytest.raises(ImportError) as exc:
+        core.load_sun()
+    msg = str(exc.value)
+    assert "/somewhere/site-packages/sun/__init__.py" in msg
+    assert "pip install --upgrade sun-solar-radiation" in msg
+    assert "pip uninstall sun" in msg
+
+
+@pytest.mark.parametrize("old", ["0.1.0", "0.0.9"])
+def test_outdated_engine_is_rejected(core, monkeypatch, old):
+    """0.1.0 lacks the never-sunlit and east-aspect fixes: refuse it."""
+    monkeypatch.setattr(core, "engine_version", lambda: old)
+    with pytest.raises(ImportError) as exc:
+        core.load_sun()
+    msg = str(exc.value)
+    assert old in msg
+    assert "pip install --upgrade sun-solar-radiation" in msg
+
+
+@pytest.mark.parametrize("ok", ["0.1.1", "0.1.10", "0.2.0", "1.0.0", "0.1.2.dev3"])
+def test_current_engine_versions_accepted(core, monkeypatch, ok):
+    monkeypatch.setattr(core, "engine_version", lambda: ok)
+    assert core.load_sun() is not None
+
+
+def test_engine_version_reads_installed_distribution(core):
+    from importlib import metadata
+
+    assert core.engine_version() == metadata.version("sun-solar-radiation")

@@ -2,7 +2,8 @@
 
 The plugin folder `sun_qgis` is deployed into QGIS profiles and uses relative
 imports; here we register it as a synthetic package and mock qgis/PyQt, while
-keeping osgeo (real GDAL) and the bundled native `sun` extension unmocked.
+keeping osgeo (real GDAL) and the pip-installed `sun` engine
+(sun-solar-radiation) unmocked.
 """
 import importlib.util
 import sys

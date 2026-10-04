@@ -133,11 +133,13 @@ class SunDialog(QDialog):
             return
 
         try:
-            plugin_dir = os.path.dirname(os.path.abspath(__file__))
-            sun = core.load_sun(plugin_dir)
-        except Exception as e:
+            sun = core.load_sun()
+        except ImportError as e:
             QMessageBox.critical(
-                self, "Solar Radiation (sun)", f"Could not load the sun extension:\n{e}"
+                self, "Solar Radiation (sun)",
+                f"The solar radiation computation engine is not available:\n\n{e}\n\n"
+                f"See the plugin README (Installation) for the install command "
+                f"on your system, then restart QGIS.",
             )
             return
 

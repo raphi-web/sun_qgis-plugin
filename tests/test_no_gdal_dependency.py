@@ -1,15 +1,16 @@
-"""The bundled extension must be GDAL-FREE.
+"""The computation engine (pip package sun-solar-radiation) must be GDAL-FREE.
 
 Raster I/O lives in Python (raster_io.py); the native module only receives
-flat f32 arrays. That is what makes the extension buildable on Windows/macOS
-without a system GDAL and keeps the plugin zip small.
+flat f32 arrays. That is what makes the engine installable from PyPI on
+Windows/macOS/Linux without a system GDAL.
 
 Guards:
-  * `ldd` on the .so must not show libgdal (or any 'not found')
+  * `ldd` on the engine's native library must not show libgdal (or any 'not found')
   * the module exposes the array API + pure compute_pixel
   * the removed path-based API (compute_raster / compute_annual_potential /
     create_dummy) is gone — plugin code must not grow back a dependency on it
 """
+import importlib
 import subprocess
 import sys
 
@@ -17,15 +18,14 @@ import pytest
 
 
 @pytest.fixture(scope="module")
-def so_path(core, plugin_dir):
-    path = core.find_extension(plugin_dir)
-    assert path is not None, "bundled extension for this interpreter missing"
-    return path
+def so_path(sun_module):
+    # The wheel's sun/__init__.py re-exports the native submodule sun.sun.
+    return importlib.import_module("sun.sun").__file__
 
 
 @pytest.fixture(scope="module")
-def sun_module(core, plugin_dir):
-    return core.load_sun(plugin_dir)
+def sun_module(core):
+    return core.load_sun()
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="ldd is Linux-specific")

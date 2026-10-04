@@ -16,19 +16,31 @@ The model accounts for solar geometry, terrain shadowing (cast shadows from ridg
 ### Requirements
 
 - QGIS 3.34 or later (ships with Python 3.12)
+- The computation engine, the Python package [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) (version 0.1.1 or newer), installed into QGIS's Python. Ready-made packages exist for Linux (x86_64, glibc 2.34 or newer, e.g. Ubuntu 22.04+), Windows (x64) and macOS (Apple Silicon). Intel Macs are not supported yet.
 - For GPU mode: a graphics card with Vulkan support (most GPUs from 2015+). Without one, the plugin silently falls back to the CPU — everything still works, just slower.
 
 ### Install Steps
 
-1. Download `sun_qgis_plugin-<version>.zip` from the [latest release](https://github.com/raphi-web/sun_qgis-plugin/releases/latest). The one zip works on Linux (x86_64), Windows (x64) and macOS (Apple Silicon)
-2. In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**, select the zip
+1. Install the computation engine into QGIS's Python (once per machine, then restart QGIS):
+   - **Windows:** open the **OSGeo4W Shell** from the Start menu (it comes with QGIS) and run
+     `pip install sun-solar-radiation`
+   - **macOS:** in Terminal run
+     `/Applications/QGIS.app/Contents/MacOS/python -m pip install sun-solar-radiation`
+     (use the name of your QGIS app, e.g. `QGIS-LTR.app`)
+   - **Linux** (QGIS from your distribution's packages): in a terminal run
+     `python3 -m pip install --user sun-solar-radiation`
+     If pip refuses with "externally-managed-environment" (Ubuntu 23.04+, Debian 12+), add `--break-system-packages`. With `--user` the package goes into your home folder, not into the system.
+2. Download `sun_qgis_plugin-<version>.zip` from the [latest release](https://github.com/raphi-web/sun_qgis-plugin/releases/latest)
+3. In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**, select the zip
    (or copy the extracted `sun_qgis` folder into your profile's `python/plugins/` directory:
    **Linux** `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/` ·
    **Windows** `%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\` ·
    **macOS** `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`)
-3. Enable the plugin: **Plugins → Manage and Install Plugins → Installed → Solar Radiation**
+4. Enable the plugin: **Plugins → Manage and Install Plugins → Installed → Solar Radiation**
 
 A sun icon appears in the toolbar; the tool is also under **Raster → Solar Radiation**.
+
+To update the engine later, run the same command with `--upgrade` (`pip install --upgrade sun-solar-radiation`).
 
 ## Usage
 
@@ -130,17 +142,18 @@ Notes:
 
 ### Plugin doesn't appear in QGIS
 
-- **QGIS version**: requires 3.34+ (older versions ship Python < 3.12, which the bundled extension can't load)
+- **QGIS version**: requires 3.34+ (older versions ship Python < 3.12, which the computation engine does not support)
 - **Enabled?**: check **Plugins → Manage and Install Plugins → Installed**
 
-### "sun extension not found" / "Failed to load" error
+### "The solar radiation computation engine is not available" error
 
-The plugin bundles a self-contained native computation library (no external dependencies — it does not use QGIS's GDAL at all).
+The calculations run in a separate Python package, `sun-solar-radiation`, that must be installed into the Python that QGIS uses. The error message says which case applies:
 
-- Make sure the zip was installed completely: the plugin folder must contain the computation library for your system: `sun.cpython-312-x86_64-linux-gnu.so` (Linux), `sun.cp312-win_amd64.pyd` (Windows) or `sun.cpython-312-darwin.so` (macOS)
-- The error message names the file your QGIS needs and the files it found. All three are built for Python 3.12 (QGIS 3.34+). If you run an older QGIS, upgrade QGIS
-- Intel Macs are not supported yet (the macOS library is Apple Silicon only)
-- Reinstalling the zip overwrites stale files from previous versions
+- **Not installed:** run the install command for your system from [Installation](#installation), then restart QGIS
+- **Too old:** run the same command with `--upgrade`, then restart QGIS
+- **Another module named `sun`:** some other package uses the same import name. The message shows its location. Remove it with `pip uninstall sun`, then install `sun-solar-radiation`
+- **Installed into the wrong Python:** a plain `pip install` in a normal terminal often targets a different Python than QGIS. To check, open **Plugins → Python Console** in QGIS and run `import sun; print(sun.__file__)`
+- **No package for your system:** Intel Macs and Linux with glibc older than 2.34 have no ready-made package yet. Please [open an issue](https://github.com/raphi-web/sun_qgis-plugin/issues)
 
 ### GPU mode doesn't seem to engage
 
@@ -177,10 +190,10 @@ Computation engine (also usable standalone from Python via `pip install sun-sola
 
 ### Building from source
 
-The repository holds plugin source only. The release zip adds the computation library for Linux, Windows and macOS, taken unmodified from the published [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) wheels, which are built from the open engine repository above.
+The repository and the release zip contain plugin source only, no compiled files. The computation engine is the [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) package on PyPI, built from the open engine repository above.
 
-- `scripts/build_qgis_plugin.sh` builds the release zip (downloads the engine wheels from PyPI)
-- `scripts/build_extension.sh` builds the engine locally into `sun_qgis/` for development and tests
+- `scripts/build_qgis_plugin.sh` builds the release zip and refuses to include compiled files
+- `scripts/build_extension.sh` builds the engine from a local checkout of the engine repository and installs it into QGIS's Python, for development
 
 ## License
 

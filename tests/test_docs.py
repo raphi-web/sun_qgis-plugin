@@ -38,20 +38,7 @@ def test_metadata_description_no_implementation_terms(metadata_text):
 def test_metadata_about_no_implementation_details(metadata_text):
     """The 'about' block (shown in plugin details) should focus on what it
     does and why users care, not how it's built."""
-    # Extract the about block (multi-line, starts with about=)
-    lines = metadata_text.splitlines()
-    about_lines = []
-    in_about = False
-    for line in lines:
-        if line.startswith("about="):
-            in_about = True
-            about_lines.append(line.split("=", 1)[1])
-        elif in_about:
-            if line.startswith(" ") or line.startswith("\t"):
-                about_lines.append(line.strip())
-            else:
-                break
-    about = " ".join(about_lines)
+    about = _about(metadata_text)
 
     # These are implementation details that don't belong in user-facing text
     forbidden = ["rayon", "wgpu", "rust", "shader", "backend"]
@@ -148,3 +135,31 @@ def test_metadata_points_to_plugin_repo(metadata_text):
 def test_readme_links_plugin_repo(readme_text):
     """README must point users at the plugin's own repo and tracker."""
     assert f"{PLUGIN_REPO}/issues" in readme_text
+
+
+def _about(metadata_text):
+    """Parse 'about' the way QGIS does (configparser keeps blank lines)."""
+    import configparser
+
+    cp = configparser.ConfigParser()
+    cp.read_string(metadata_text)
+    return " ".join(cp["general"]["about"].split())
+
+
+def test_about_states_engine_dependency(metadata_text):
+    """plugins.qgis.org: external dependencies must be stated in About."""
+    about = _about(metadata_text)
+    assert "pip install sun-solar-radiation" in about
+
+
+def test_readme_install_covers_engine_on_every_platform(readme_text):
+    assert "pip install sun-solar-radiation" in readme_text
+    assert "OSGeo4W Shell" in readme_text, "Windows install route missing"
+    assert "Contents/MacOS" in readme_text, "macOS install route missing"
+    assert "--user" in readme_text, "Linux install route missing"
+
+
+def test_readme_does_not_describe_bundled_binaries(readme_text):
+    for name in ("sun.cpython-312-x86_64-linux-gnu.so", "sun.cp312-win_amd64.pyd",
+                 "sun.cpython-312-darwin.so"):
+        assert name not in readme_text, f"README still describes bundled {name}"
