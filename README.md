@@ -170,7 +170,9 @@ The model is the GRASS GIS `r.sun` clear-sky solar radiation model (Hofierka & S
 
 Raster I/O is handled by QGIS/GDAL in Python; the computation engine receives plain arrays and has no file-format or GDAL dependency.
 
-Source and issue tracker: [github.com/raphi-web/sun-solar-radiation](https://github.com/raphi-web/sun-solar-radiation)
+Plugin source and issue tracker: [github.com/raphi-web/sun_qgis-plugin](https://github.com/raphi-web/sun_qgis-plugin) ([report a bug](https://github.com/raphi-web/sun_qgis-plugin/issues))
+
+Computation engine (also usable standalone from Python via `pip install sun-solar-radiation`): [github.com/raphi-web/sun-solar-radiation](https://github.com/raphi-web/sun-solar-radiation)
 
 ## License
 

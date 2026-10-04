@@ -125,3 +125,26 @@ def test_readme_documents_aspect_convention(readme_text):
     """The engine uses GRASS aspect convention (0=E, CCW). Documenting the
     wrong convention silently corrupts user-supplied aspect rasters."""
     assert "grass" in readme_text.lower(), "aspect convention undocumented"
+
+
+PLUGIN_REPO = "https://github.com/raphi-web/sun_qgis-plugin"
+
+
+def _metadata_field(metadata_text, key):
+    for line in metadata_text.splitlines():
+        if line.startswith(f"{key}="):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
+def test_metadata_points_to_plugin_repo(metadata_text):
+    """plugins.qgis.org shows repository/tracker to users: plugin bugs must
+    land in the plugin repo, not the computation-engine repo."""
+    assert _metadata_field(metadata_text, "repository") == PLUGIN_REPO
+    assert _metadata_field(metadata_text, "tracker") == f"{PLUGIN_REPO}/issues"
+    assert _metadata_field(metadata_text, "homepage") == PLUGIN_REPO
+
+
+def test_readme_links_plugin_repo(readme_text):
+    """README must point users at the plugin's own repo and tracker."""
+    assert f"{PLUGIN_REPO}/issues" in readme_text
