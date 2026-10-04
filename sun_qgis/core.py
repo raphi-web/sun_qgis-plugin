@@ -82,36 +82,60 @@ def validate_form(form):
     return errors
 
 
+def find_extension(plugin_dir, suffixes=None):
+    """Return the `sun` engine binary THIS interpreter can import, or None.
+
+    The release zip bundles one binary per platform (Linux .so, macOS .so,
+    Windows .pyd). Matching against the interpreter's own extension suffixes
+    (importlib.machinery.EXTENSION_SUFFIXES, most specific first) picks the
+    right one; "the first sun* file" would pick macOS's on Linux.
+    """
+    import importlib.machinery
+
+    plugin_dir = Path(plugin_dir)
+    if suffixes is None:
+        suffixes = importlib.machinery.EXTENSION_SUFFIXES
+    for suffix in suffixes:
+        candidate = plugin_dir / f"sun{suffix}"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def load_sun(plugin_dir):
     """Import the bundled `sun` native extension from *plugin_dir*.
 
-    Raises FileNotFoundError with an actionable message when the compiled
-    extension is missing (e.g. plugin copied without its .so).
+    Raises FileNotFoundError when no engine binary is present at all, and
+    ImportError naming the found vs needed files when binaries exist but none
+    fits this interpreter (other platform or other Python version).
     """
-    plugin_dir = Path(plugin_dir)
-    so_files = sorted(plugin_dir.glob("sun*.so"))
-    if not so_files:
-        raise FileNotFoundError(
-            f"sun extension not found in {plugin_dir}. Expected a compiled "
-            f"'sun*.so' (build with: maturin build --release in the Rust repo, "
-            f"then copy target/wheels/… .so into the plugin directory)."
-        )
-
-    # Make the .so importable as module name `sun`.
+    import importlib.machinery
     import importlib.util
 
-    current = sys.version_info
-    so_path = so_files[0]
+    plugin_dir = Path(plugin_dir)
+    so_path = find_extension(plugin_dir)
+    if so_path is None:
+        present = sorted(
+            p.name for p in plugin_dir.glob("sun*") if p.suffix in (".so", ".pyd")
+        )
+        if not present:
+            raise FileNotFoundError(
+                f"sun extension not found in {plugin_dir}. Reinstall the plugin "
+                f"from the release zip (it bundles the engine for Linux, Windows "
+                f"and macOS)."
+            )
+        current = sys.version_info
+        raise ImportError(
+            f"No sun extension in {plugin_dir} fits this QGIS "
+            f"(Python {current[0]}.{current[1]}, needs "
+            f"'sun{importlib.machinery.EXTENSION_SUFFIXES[0]}'). "
+            f"Found: {', '.join(present)}."
+        )
+
+    # Make the binary importable as module name `sun`.
     spec = importlib.util.spec_from_file_location("sun", so_path)
     mod = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(mod)
-    except ImportError as e:
-        raise ImportError(
-            f"Failed to load {so_path.name}: {e}. The extension was built for "
-            f"Python {so_path.name.split('cpython-')[-1].split('.')[0] if 'cpython' in so_path.name else '?'} "
-            f"but this interpreter is {current[0]}.{current[1]}."
-        ) from e
+    spec.loader.exec_module(mod)
 
     missing = [a for a in REQUIRED_API if not hasattr(mod, a)]
     if missing:

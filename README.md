@@ -20,7 +20,7 @@ The model accounts for solar geometry, terrain shadowing (cast shadows from ridg
 
 ### Install Steps
 
-1. Download the plugin zip (`sun_qgis_plugin-<version>.zip`)
+1. Download `sun_qgis_plugin-<version>.zip` from the [latest release](https://github.com/raphi-web/sun_qgis-plugin/releases/latest). The one zip works on Linux (x86_64), Windows (x64) and macOS (Apple Silicon)
 2. In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**, select the zip
    (or copy the extracted `sun_qgis` folder into your profile's `python/plugins/` directory:
    **Linux** `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/` ·
@@ -137,8 +137,9 @@ Notes:
 
 The plugin bundles a self-contained native computation library (no external dependencies — it does not use QGIS's GDAL at all).
 
-- Make sure the zip was installed completely: the plugin folder must contain a file named like `sun.cpython-312-*.so` (Linux/macOS) or `.pyd` (Windows)
-- The error message names the Python version the bundled file was built for — it must be 3.12 (QGIS 3.34+). If you run an older QGIS, upgrade QGIS
+- Make sure the zip was installed completely: the plugin folder must contain the computation library for your system: `sun.cpython-312-x86_64-linux-gnu.so` (Linux), `sun.cp312-win_amd64.pyd` (Windows) or `sun.cpython-312-darwin.so` (macOS)
+- The error message names the file your QGIS needs and the files it found. All three are built for Python 3.12 (QGIS 3.34+). If you run an older QGIS, upgrade QGIS
+- Intel Macs are not supported yet (the macOS library is Apple Silicon only)
 - Reinstalling the zip overwrites stale files from previous versions
 
 ### GPU mode doesn't seem to engage
@@ -173,6 +174,13 @@ Raster I/O is handled by QGIS/GDAL in Python; the computation engine receives pl
 Plugin source and issue tracker: [github.com/raphi-web/sun_qgis-plugin](https://github.com/raphi-web/sun_qgis-plugin) ([report a bug](https://github.com/raphi-web/sun_qgis-plugin/issues))
 
 Computation engine (also usable standalone from Python via `pip install sun-solar-radiation`): [github.com/raphi-web/sun-solar-radiation](https://github.com/raphi-web/sun-solar-radiation)
+
+### Building from source
+
+The repository holds plugin source only. The release zip adds the computation library for Linux, Windows and macOS, taken unmodified from the published [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) wheels, which are built from the open engine repository above.
+
+- `scripts/build_qgis_plugin.sh` builds the release zip (downloads the engine wheels from PyPI)
+- `scripts/build_extension.sh` builds the engine locally into `sun_qgis/` for development and tests
 
 ## License
 

@@ -12,16 +12,15 @@ Guards:
 """
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture(scope="module")
 def so_path(core, plugin_dir):
-    so_files = sorted(Path(plugin_dir).glob("sun*.so"))
-    assert so_files, "bundled extension missing"
-    return so_files[0]
+    path = core.find_extension(plugin_dir)
+    assert path is not None, "bundled extension for this interpreter missing"
+    return path
 
 
 @pytest.fixture(scope="module")
