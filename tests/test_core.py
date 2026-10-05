@@ -55,9 +55,10 @@ def test_unrelated_sun_module_is_rejected(core, monkeypatch):
     assert "pip uninstall sun" in msg
 
 
-@pytest.mark.parametrize("old", ["0.1.0", "0.0.9"])
+@pytest.mark.parametrize("old", ["0.1.0", "0.0.9", "0.1.1"])
 def test_outdated_engine_is_rejected(core, monkeypatch, old):
-    """0.1.0 lacks the never-sunlit and east-aspect fixes: refuse it."""
+    """0.1.0 lacks the never-sunlit and east-aspect fixes; 0.1.1 can hand
+    the GPU one submission long enough for the driver to reset it."""
     monkeypatch.setattr(core, "engine_version", lambda: old)
     with pytest.raises(ImportError) as exc:
         core.load_sun()
@@ -66,7 +67,7 @@ def test_outdated_engine_is_rejected(core, monkeypatch, old):
     assert "pip install --upgrade sun-solar-radiation" in msg
 
 
-@pytest.mark.parametrize("ok", ["0.1.1", "0.1.10", "0.2.0", "1.0.0", "0.1.2.dev3"])
+@pytest.mark.parametrize("ok", ["0.1.2", "0.1.10", "0.2.0", "1.0.0", "0.1.3.dev3"])
 def test_current_engine_versions_accepted(core, monkeypatch, ok):
     monkeypatch.setattr(core, "engine_version", lambda: ok)
     assert core.load_sun() is not None

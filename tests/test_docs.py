@@ -169,3 +169,20 @@ def test_readme_does_not_describe_bundled_binaries(readme_text):
     for name in ("sun.cpython-312-x86_64-linux-gnu.so", "sun.cp312-win_amd64.pyd",
                  "sun.cpython-312-darwin.so"):
         assert name not in readme_text, f"README still describes bundled {name}"
+
+
+def test_docs_state_the_minimum_engine_version(core, readme_text, metadata_text):
+    """README and About must name the version load_sun() actually enforces."""
+    need = ".".join(map(str, core.MIN_ENGINE_VERSION))
+    assert f"(version {need} or newer)" in readme_text
+    assert f"sun-solar-radiation ({need} or newer)" in _about(metadata_text)
+
+
+def test_minimum_engine_has_the_gpu_watchdog_fix(core):
+    """0.1.2 splits GPU work into short submissions; older engines can make
+    the graphics driver reset the GPU and take QGIS down on large DEMs."""
+    assert core.MIN_ENGINE_VERSION >= (0, 1, 2)
+
+
+def test_readme_explains_gpu_failure_message(readme_text):
+    assert "GPU computation failed" in readme_text

@@ -34,7 +34,7 @@ The model accounts for solar geometry, terrain shadowing (cast shadows from ridg
 ### Requirements
 
 - QGIS 3.34 or later (ships with Python 3.12)
-- The computation engine, the Python package [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) (version 0.1.1 or newer), installed into QGIS's Python. Ready-made packages exist for Linux (x86_64, glibc 2.34 or newer, e.g. Ubuntu 22.04+), Windows (x64) and macOS (Apple Silicon). Intel Macs are not supported yet.
+- The computation engine, the Python package [`sun-solar-radiation`](https://pypi.org/project/sun-solar-radiation/) (version 0.1.2 or newer), installed into QGIS's Python. Ready-made packages exist for Linux (x86_64, glibc 2.34 or newer, e.g. Ubuntu 22.04+), Windows (x64) and macOS (Apple Silicon). Intel Macs are not supported yet.
 - For GPU mode: a graphics card with Vulkan support (most GPUs from 2015+). Without one, the plugin silently falls back to the CPU — everything still works, just slower.
 
 ### Install Steps
@@ -160,6 +160,14 @@ The calculations run in a separate Python package, `sun-solar-radiation`, that m
 - The plugin probes for a usable GPU at run time and silently falls back to the CPU when none is found — results are still correct
 - On Linux, `vulkaninfo --summary` should list your GPU; if it lists only `llvmpipe`, install your vendor's Vulkan driver (e.g. `mesa-vulkan-drivers` / `vulkan-radeon`, `nvidia-driver`)
 - Virtual machines and remote sessions often expose no GPU; the CPU path handles those
+
+### "GPU computation failed" error
+
+The graphics driver stopped the GPU computation, or the GPU was reset while the plugin was running. QGIS keeps running and shows this message; the output raster of that run is incomplete, so delete it.
+
+- Uncheck **GPU acceleration** and run again. The CPU computes the same results, only slower
+- Make sure the engine is version 0.1.2 or newer (`pip install --upgrade sun-solar-radiation`). Older versions could run one GPU step for several seconds on large DEMs, which the driver treats as a hang
+- If it keeps happening on GPU, please [open an issue](https://github.com/raphi-web/sun_qgis-plugin/issues) with your GPU model and DEM size
 
 ### Results look wrong
 

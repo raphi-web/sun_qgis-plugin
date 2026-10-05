@@ -8,7 +8,9 @@ raster I/O in raster_io.py, and the tiled computation loop in pipeline.py.
 # `sun`). The plugin ships no binaries; load_sun() imports the installed one.
 ENGINE_DIST = "sun-solar-radiation"
 # 0.1.1 fixed never-sunlit slopes (nodata) and east aspect computed as north.
-MIN_ENGINE_VERSION = (0, 1, 1)
+# 0.1.2 keeps every GPU submission short so the driver never resets the GPU
+# (large DEMs took QGIS down) and reports GPU failures as errors.
+MIN_ENGINE_VERSION = (0, 1, 2)
 
 # The engine is GDAL-free: it exposes only the array API (band-in /
 # band-out) plus the pure single-pixel helper. Raster I/O lives in Python
