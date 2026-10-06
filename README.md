@@ -14,6 +14,10 @@ Measured on a laptop with AMD Ryzen 5 PRO 8540U (12 threads) and integrated Rade
 | 1000×1000   | Annual (37 sampled days)  | 123 s   | 5.5 s  | 22×     |
 | 2000×2000   | Daily                     | 16.5 s  | 1.3 s  | 13×     |
 
+![Solar potential over eastern Vienna](assets/solar_potential_vienna.png)
+
+*Annual PV potential for eastern Vienna (3.5 M pixels at 10 m resolution), computed on an integrated laptop GPU in minutes. Left: satellite imagery. Right: modeled clear-sky yield (47–528 kWh/m²/year).*
+
 Notes:
 
 - Larger DEMs benefit more — the per-run setup cost amortizes.
