@@ -42,6 +42,17 @@ def _flat(arr):
     return np.ascontiguousarray(arr, dtype=np.float32).ravel()
 
 
+def _run_native(fn, use_gpu, **kwargs):
+    """Call a native band function; on GPU RuntimeError, retry on CPU."""
+    try:
+        return fn(gpu=use_gpu, **kwargs)
+    except RuntimeError as e:
+        msg = str(e)
+        if use_gpu and msg.startswith("GPU computation failed"):
+            return fn(gpu=False, **kwargs)
+        raise
+
+
 def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS,
               canceled_check=None, fine_progress_cb=None):
     """Run the sun computation for *form* with tiled I/O. Returns the list
@@ -145,7 +156,7 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
             if canceled_check():
                 raise RuntimeError("cancel")
             t0 = time.perf_counter()
-            result = sun.compute_raster_bands(
+            result = _run_native(sun.compute_raster_bands, use_gpu,
                 elevation=_flat(elev_full[start:end]),
                 ncols=ncols,
                 nrows=end - start,
@@ -165,7 +176,6 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                 row_offset=start,
                 full_nrows=nrows,
                 outputs=[k for k, _ in wanted],
-                gpu=use_gpu,  # adapter-probed; CPU fallback when unavailable
                 quiet=True,
             )
             for native_key, _ in wanted:
@@ -203,7 +213,7 @@ def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
             if canceled_check():
                 raise RuntimeError("cancel")
             t0 = time.perf_counter()
-            arr = sun.compute_annual_bands(
+            arr = _run_native(sun.compute_annual_bands, use_gpu,
                 elevation=_flat(elev_full[start:end]),
                 ncols=ncols,
                 nrows=end - start,
@@ -226,7 +236,6 @@ def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                 shadow_context_elev=shadow_flat,
                 row_offset=start,
                 full_nrows=nrows,
-                gpu=use_gpu,
                 use_horizon=bool(form.get("use_horizon")),
                 horizon_n_az=int(form.get("horizon_n_az", 64)),
                 quiet=True,
