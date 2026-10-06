@@ -152,7 +152,7 @@ class SunDialog(QDialog):
         task.taskTerminated.connect(self._on_terminated)
         self._task = task
         self._set_running(True)
-        self.mStatus.setText("Starting computation…")
+        self.mStatus.setText("Computing…")
 
         if self._run_computation is not None:
             self._run_computation(task, form)
@@ -160,8 +160,7 @@ class SunDialog(QDialog):
             QgsApplication.taskManager().addTask(task)
 
     def _on_progress(self, pct):
-        self.mProgress.setValue(int(pct))
-        self.mStatus.setText(f"Computing… {int(pct)}%")
+        self.mStatus.setText(f"Computing…")
 
     def _on_task_done(self):
         from . import core  # noqa: F401  (kept for symmetry; glue only)
@@ -169,6 +168,7 @@ class SunDialog(QDialog):
         task, self._task = self._task, None
         self._set_running(False)
         if task is not None and task.outputs:
+            self.mProgress.setMaximum(100)
             self.mProgress.setValue(100)
             self.mStatus.setText(
                 f"Done — {len(task.outputs)} raster(s) written to "
@@ -198,7 +198,8 @@ class SunDialog(QDialog):
         self.groupInputs.setEnabled(not running)
         self.groupOutput.setEnabled(not running)
         if running:
-            self.mProgress.setRange(0, 100)
+            self.mProgress.setMinimum(0)
+            self.mProgress.setMaximum(0)  # indeterminate — bounces, doesn't lie
             self.mProgress.setValue(0)
 
     def _on_close_requested(self):
