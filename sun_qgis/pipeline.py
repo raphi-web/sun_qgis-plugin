@@ -42,7 +42,8 @@ def _flat(arr):
     return np.ascontiguousarray(arr, dtype=np.float32).ravel()
 
 
-def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS):
+def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS,
+              canceled_check=None, fine_progress_cb=None):
     """Run the sun computation for *form* with tiled I/O. Returns the list
     of written output paths.
 
@@ -52,6 +53,8 @@ def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS):
     errors = core.validate_form(form)
     if errors:
         raise ValueError("\n".join(errors))
+
+    canceled_check = canceled_check if canceled_check is not None else (lambda: False)
 
     meta = raster_meta(str(form["elevation"]))
     ncols, nrows = meta["ncols"], meta["nrows"]
@@ -85,12 +88,14 @@ def run_tiled(sun, form, progress_cb=None, band_rows=DEFAULT_BAND_ROWS):
         paths = _run_annual_bands(sun, form, meta, plan, ncols, nrows,
                                   elev_full, lats, shadow_flat,
                                   derived_slope, derived_aspect,
-                                  dx_m, dy_m, progress_cb, use_gpu)
+                                  dx_m, dy_m, progress_cb, use_gpu,
+                                  canceled_check, fine_progress_cb)
     else:
         paths = _run_daily_bands(sun, form, meta, plan, ncols, nrows,
                                  elev_full, lats, shadow_flat,
                                  derived_slope, derived_aspect,
-                                 dx_m, dy_m, progress_cb, use_gpu)
+                                 dx_m, dy_m, progress_cb, use_gpu,
+                                 canceled_check, fine_progress_cb)
     return paths
 
 
@@ -114,7 +119,8 @@ def _read_optional(form, key, start, end, ncols, nrows, derived):
 
 def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                      shadow_flat, derived_slope, derived_aspect,
-                     dx_m, dy_m, progress_cb, use_gpu):
+                     dx_m, dy_m, progress_cb, use_gpu,
+                     canceled_check=None, fine_progress_cb=None):
     from pathlib import Path
 
     out_dir = Path(str(form["output_dir"]))
@@ -133,7 +139,12 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
             datasets[native_key] = create_output(p, meta, nodata=UNDEFZ)
             paths.append(p)
 
+        import time
+        prev_elapsed = None
         for start, end in plan:
+            if canceled_check():
+                raise RuntimeError("cancel")
+            t0 = time.perf_counter()
             result = sun.compute_raster_bands(
                 elevation=_flat(elev_full[start:end]),
                 ncols=ncols,
@@ -162,6 +173,12 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                 write_band(datasets[native_key], arr, start)
             if progress_cb is not None:
                 progress_cb(100.0 * end / nrows)
+            if fine_progress_cb is not None:
+                elapsed = time.perf_counter() - t0
+                pct_start = 100.0 * start / nrows
+                pct_end = 100.0 * end / nrows
+                fine_progress_cb(pct_start, pct_end, elapsed)
+                prev_elapsed = elapsed
     finally:
         for ds in datasets.values():
             ds.FlushCache()
@@ -171,7 +188,8 @@ def _run_daily_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
 
 def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
                       shadow_flat, derived_slope, derived_aspect,
-                      dx_m, dy_m, progress_cb, use_gpu):
+                      dx_m, dy_m, progress_cb, use_gpu,
+                      canceled_check=None, fine_progress_cb=None):
     from pathlib import Path
 
     out_dir = Path(str(form["output_dir"]))
@@ -179,7 +197,12 @@ def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
     path = str(out_dir / f"{prefix}_potential.tif")
     ds = create_output(path, meta, nodata=UNDEFZ)
     try:
+        import time
+        prev_elapsed = None
         for start, end in plan:
+            if canceled_check():
+                raise RuntimeError("cancel")
+            t0 = time.perf_counter()
             arr = sun.compute_annual_bands(
                 elevation=_flat(elev_full[start:end]),
                 ncols=ncols,
@@ -211,6 +234,12 @@ def _run_annual_bands(sun, form, meta, plan, ncols, nrows, elev_full, lats,
             write_band(ds, np.asarray(arr).reshape(end - start, ncols), start)
             if progress_cb is not None:
                 progress_cb(100.0 * end / nrows)
+            if fine_progress_cb is not None:
+                elapsed = time.perf_counter() - t0
+                pct_start = 100.0 * start / nrows
+                pct_end = 100.0 * end / nrows
+                fine_progress_cb(pct_start, pct_end, elapsed)
+                prev_elapsed = elapsed
     finally:
         ds.FlushCache()
         ds = None

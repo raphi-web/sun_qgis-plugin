@@ -11,7 +11,7 @@ from qgis.core import QgsTask
 from . import pipeline
 
 
-def run_sun_task(sun, form, progress_cb=None, band_rows=None):
+def run_sun_task(sun, form, progress_cb=None, band_rows=None, canceled_check=None):
     """Validate *form*, run the tiled computation, return output paths.
 
     *progress_cb* (if given) receives monotonically increasing 0..100 floats,
@@ -23,10 +23,13 @@ def run_sun_task(sun, form, progress_cb=None, band_rows=None):
     (rows processed per native call; smaller = less memory for optional
     inputs/outputs on huge DEMs).
 
+    *canceled_check* (if given) is called before each band; return True to
+    abort the computation with RuntimeError("cancel").
+
     Raises ValueError with the validation errors joined; native/IO failures
     propagate untouched.
     """
-    kwargs = {"progress_cb": progress_cb}
+    kwargs = {"progress_cb": progress_cb, "canceled_check": canceled_check}
     if band_rows is not None:
         kwargs["band_rows"] = int(band_rows)
     return pipeline.run_tiled(sun, form, **kwargs)
@@ -54,6 +57,7 @@ class SunComputationTask(QgsTask):
                 self.form,
                 progress_cb=self.setProgress,
                 band_rows=self.band_rows,
+                canceled_check=self.isCanceled,
             )
             return True
         except Exception as e:  # surfaced to the GUI thread in finished()

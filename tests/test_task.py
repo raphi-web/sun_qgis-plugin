@@ -79,11 +79,13 @@ def test_invalid_form_raises_valueerror_before_any_io(task_module):
 def test_run_sun_task_delegates_to_pipeline(task_module, monkeypatch):
     recorded = {}
 
-    def fake_run(sun, form, progress_cb=None, band_rows=None):
+    def fake_run(sun, form, progress_cb=None, band_rows=None, canceled_check=None, fine_progress_cb=None):
         recorded["sun"] = sun
         recorded["form"] = form
         recorded["cb"] = progress_cb
         recorded["band_rows"] = band_rows
+        recorded["canceled"] = canceled_check
+        recorded["fine"] = fine_progress_cb
         return ["/x/out.tif"]
 
     monkeypatch.setattr(task_module.pipeline, "run_tiled", fake_run)
